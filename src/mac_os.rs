@@ -102,7 +102,10 @@ impl NativeWebView {
             // setup config
             let mut webview_config = WebViewConfig::default();
             webview_config.handlers.push("main".to_owned());
+
+            // TODO: expose via the public API
             webview_config.enable_developer_extras();
+
             set_config_value(&webview_config, "fullScreenEnabled", true);
             set_config_value(&webview_config, "DOMPasteAllowed", true);
             set_config_value(&webview_config, "javaScriptCanAccessClipboard", true);
@@ -117,6 +120,10 @@ impl NativeWebView {
                 width: size.0 as f64,
                 height: size.1 as f64
             });
+
+            // TODO: need to implement and return `YES` from the `acceptsFirstMouse` method of the webview.
+            // this way, the first mouse click can interact with elements in the view (not just focus it).
+            // https://developer.apple.com/documentation/appkit/nsview/1483410-acceptsfirstmouse?language=objc
             
             // add webview to parent view (received via raw window handle)
             let root_view = handle.ns_view as id;
