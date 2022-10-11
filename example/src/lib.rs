@@ -3,6 +3,7 @@ use nih_plug::prelude::*;
 use std::sync::Arc;
 use nih_plug_webview::*;
 use serde_json::json;
+use std::sync::atomic::Ordering;
 
 struct Gain {
     params: Arc<GainParams>,
@@ -87,21 +88,38 @@ impl Plugin for Gain {
     fn editor(&self) -> Option<Box<dyn Editor>> {
         let params = self.params.clone();
         Some(Box::new(
-          WebViewEditor::new(HTMLSource::String(include_str!("gui.html")), (200, 200), move |ctx| {
+          WebViewEditor::new(HTMLSource::String(include_str!("gui.html")), (200, 200), move |ctx, setter| {
             for msg in ctx.consume_json() {
+                // you'll probably want to parse events into structs with Serde in a real scenario
                 match msg.get("type").unwrap().as_str().unwrap() {
                     "set_gain" => {
-                        let setter = ParamSetter::new(&**ctx.gui_context.as_ref().unwrap());
+                        let value = msg.get("value").unwrap().as_f64().unwrap() as f32;
                         setter.begin_set_parameter(&params.gain);
-                        setter.set_parameter_normalized(&params.gain, msg.get("value").unwrap().as_f64().unwrap() as f32);
+                        setter.set_parameter_normalized(&params.gain, value);
                         setter.end_set_parameter(&params.gain);
                     },
+                    "set_size" => {
+                        let width = msg.get("width").unwrap().as_u64().unwrap();
+                        let height = msg.get("height").unwrap().as_u64().unwrap();
+                        ctx.resize((width as u32, height as u32));
+                    },
+                    "init" => {
+                        ctx.send_json(json!({
+                            "type": "set_size",
+                            "width": ctx.width.load(Ordering::Relaxed),
+                            "height": ctx.height.load(Ordering::Relaxed)
+                        }));
+                    }
                     _ => {}
                 }
             }
 
-            // dumb but good enough for the mvp
-            ctx.send_json(json!({ "gain": params.gain.normalized_value() }));
+            // sends the param change each frame which is wasteful but good enough for this mvp
+            ctx.send_json(json!({
+                "type": "param_change",
+                "param": "gain",
+                "value": params.gain.normalized_value()
+            }));
           })
         ))
       }
