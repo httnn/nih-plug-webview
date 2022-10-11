@@ -40,15 +40,16 @@ impl Context {
         }
     }
     
-    pub fn send_json(&mut self, json: Value) {
+    pub fn send_json(&mut self, json: Value) -> Result<(), Option<Value>> {
         if let Some(view) = &self.native_view {
             if let Ok(json_str) = serde_json::to_string(&json) {
                 view.evaluate_javascript(&format!("onPluginMessageInternal(`{}`);", json_str));
+                return Ok(());
             } else {
-                // TODO: handle more gracefully
-                panic!("Tried to send invalid JSON to web view: {}.", json);
+                return Err(Some(json));
             }
         }
+        Err(None)
     }
     
     pub fn consume_json(&mut self) -> Vec<Value> {
