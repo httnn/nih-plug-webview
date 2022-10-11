@@ -2,7 +2,7 @@
 mod mac_os;
 
 use std::sync::{Arc, Mutex, atomic::{AtomicU32, Ordering}};
-use nih_plug::prelude::{Editor, GuiContext};
+use nih_plug::prelude::{Editor, GuiContext, ParamSetter};
 use serde_json::Value;
 use self::mac_os::{NativeWebView, Timer};
 
@@ -64,7 +64,7 @@ pub struct WebViewEditor {
     context: Arc<Mutex<Context>>,
     width: Arc<AtomicU32>,
     height: Arc<AtomicU32>,
-    cb: Arc<dyn Fn(&mut Context) + 'static + Send + Sync>
+    cb: Arc<dyn Fn(&mut Context, ParamSetter) + 'static + Send + Sync>
 }
 
 pub enum HTMLSource {
@@ -74,7 +74,7 @@ pub enum HTMLSource {
 
 impl WebViewEditor {
     pub fn new<F>(source: HTMLSource, size: (u32, u32), cb: F) -> Self
-    where F: Fn(&mut Context) + 'static + Send + Sync {
+    where F: Fn(&mut Context, ParamSetter) + 'static + Send + Sync {
         let width = Arc::new(AtomicU32::new(size.0));
         let height = Arc::new(AtomicU32::new(size.1));
         Self {
@@ -119,9 +119,11 @@ impl Editor for WebViewEditor {
         // setup timer callback
         let context = self.context.clone();
         let cb = self.cb.clone();
+        let gui_ctx = gui_context.clone();
         let timer_callback = move || {
             if let Ok(mut s) = context.lock() {
-                cb(&mut s);
+                let setter = ParamSetter::new(&*gui_ctx);
+                cb(&mut s, setter);
             }
         };
         
