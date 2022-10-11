@@ -1,6 +1,9 @@
 #[cfg(target_os = "macos")]
 mod mac_os;
 
+#[cfg(target_os = "windows")]
+mod windows;
+
 use std::sync::{Arc, Mutex, atomic::{AtomicU32, Ordering}};
 use nih_plug::prelude::{Editor, GuiContext, ParamSetter};
 use serde_json::Value;
