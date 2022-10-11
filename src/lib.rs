@@ -23,8 +23,8 @@ pub struct Context {
     native_view: Option<NativeWebView>,
     pub gui_context: Option<Arc<dyn GuiContext>>,
     messages: Vec<Value>,
-    width: Arc<AtomicU32>,
-    height: Arc<AtomicU32>,
+    pub width: Arc<AtomicU32>,
+    pub height: Arc<AtomicU32>,
 }
 
 impl Context {
