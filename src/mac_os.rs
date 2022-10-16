@@ -77,6 +77,8 @@ impl WebViewDelegate for WebViewInstance {
     fn on_message(&self, _name: &str, body: &str) {
         (self.message_callback)(body);
     }
+
+    const NAME: &'static str = "WebViewDelegate";
 }
 
 pub struct NativeWebView {
