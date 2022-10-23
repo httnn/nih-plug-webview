@@ -85,7 +85,6 @@ checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 [[package]]
 name = "cacao"
 version = "0.3.2"
-source = "git+https://github.com/ryanmcgrath/cacao?branch=feat/change-objc-classdec#f8e836e3eb2579bb0b49a0733ee1b7563e51fde6"
 dependencies = [
  "block",
  "core-foundation",

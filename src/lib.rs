@@ -102,7 +102,7 @@ impl Editor for WebViewEditor {
         &self,
         parent: nih_plug::prelude::ParentWindowHandle,
         gui_context: Arc<dyn GuiContext>,
-    ) -> Box<dyn std::any::Any + Send + Sync> {
+    ) -> Box<dyn std::any::Any + Send> {
         // setup native web view        
         {
             let mut context = self.context.lock().unwrap();
