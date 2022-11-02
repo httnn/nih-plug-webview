@@ -1,4 +1,4 @@
-# nih_plug_webview
+# nih-plug-webview
 
 **WIP**
 
