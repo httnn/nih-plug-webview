@@ -44,6 +44,8 @@ impl Default for GainParams {
 }
 
 impl Plugin for Gain {
+    type BackgroundTask = ();
+
     const NAME: &'static str = "Gain";
     const VENDOR: &'static str = "Moist Plugins GmbH";
     const URL: &'static str = "https://youtu.be/dQw4w9WgXcQ";
@@ -72,7 +74,7 @@ impl Plugin for Gain {
         &mut self,
         buffer: &mut Buffer,
         _aux: &mut AuxiliaryBuffers,
-        _context: &mut impl ProcessContext,
+        _context: &mut impl ProcessContext<Self>,
     ) -> ProcessStatus {
         for channel_samples in buffer.iter_samples() {
             let gain = self.params.gain.smoothed.next();
@@ -85,7 +87,7 @@ impl Plugin for Gain {
         ProcessStatus::Normal
     }
 
-    fn editor(&self) -> Option<Box<dyn Editor>> {
+    fn editor(&self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let params = self.params.clone();
         Some(Box::new(
           WebViewEditor::new(HTMLSource::String(include_str!("gui.html")), (200, 200), move |ctx, setter| {

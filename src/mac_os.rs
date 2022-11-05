@@ -123,10 +123,6 @@ impl NativeWebView {
                 height: size.1 as f64
             });
 
-            // TODO: need to implement and return `YES` from the `acceptsFirstMouse` method of the webview.
-            // this way, the first mouse click can interact with elements in the view (not just focus it).
-            // https://developer.apple.com/documentation/appkit/nsview/1483410-acceptsfirstmouse?language=objc
-            
             // add webview to parent view (received via raw window handle)
             let root_view = handle.ns_view as id;
             view.objc.get(|obj| {
