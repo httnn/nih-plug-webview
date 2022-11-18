@@ -63,12 +63,53 @@ impl Context {
     }
 }
 
+type MessageCallback = dyn Fn(&mut Context, ParamSetter) + 'static + Send + Sync;
+
+pub struct WebViewEditorBuilder {
+    source: Option<Arc<HTMLSource>>,
+    size: Option<(u32, u32)>,
+    cb: Option<Arc<MessageCallback>>,
+    developer_mode: bool
+}
+
+impl WebViewEditorBuilder {
+    pub fn new() -> Self {
+        Self { source: None, size: None, cb: None, developer_mode: false }
+    }
+
+    pub fn with_source(&mut self, source: HTMLSource) -> &mut Self {
+        self.source = Some(Arc::new(source));
+        self
+    }
+
+    pub fn with_size(&mut self, width: u32, height: u32) -> &mut Self {
+        self.size = Some((width, height));
+        self
+    }
+
+    pub fn with_callback<F>(&mut self, callback: F) -> &mut Self
+    where F: Fn(&mut Context, ParamSetter) + 'static + Send + Sync {
+        self.cb = Some(Arc::new(callback));
+        self
+    }
+
+    pub fn with_developer_mode(&mut self, mode: bool) -> &mut Self {
+        self.developer_mode = mode;
+        self
+    }
+
+    pub fn build(&self) -> Result<WebViewEditor, ()> {
+        WebViewEditor::new(&self)
+    }
+}
+
 pub struct WebViewEditor {
-    source: Arc<HTMLSource>,
     context: Arc<Mutex<Context>>,
+    source: Arc<HTMLSource>,
     width: Arc<AtomicU32>,
     height: Arc<AtomicU32>,
-    cb: Arc<dyn Fn(&mut Context, ParamSetter) + 'static + Send + Sync>
+    cb: Arc<MessageCallback>,
+    developer_mode: bool
 }
 
 pub enum HTMLSource {
@@ -77,22 +118,27 @@ pub enum HTMLSource {
 }
 
 impl WebViewEditor {
-    pub fn new<F>(source: HTMLSource, size: (u32, u32), cb: F) -> Self
-    where F: Fn(&mut Context, ParamSetter) + 'static + Send + Sync {
-        let width = Arc::new(AtomicU32::new(size.0));
-        let height = Arc::new(AtomicU32::new(size.1));
-        Self {
-            source: Arc::new(source),
-            context: Arc::new(Mutex::new(Context {
-                native_view: None,
-                gui_context: None,
-                messages: vec!(),
-                width: width.clone(),
-                height: height.clone()
-            })),
-            width,
-            height,
-            cb: Arc::new(cb)
+    pub fn new(builder: &WebViewEditorBuilder) -> Result<Self, ()> {
+        match (builder.source.clone(), builder.cb.clone(), builder.size) {
+            (Some(source), Some(cb), Some(size)) => {
+                let width = Arc::new(AtomicU32::new(size.0));
+                let height = Arc::new(AtomicU32::new(size.1));
+                Ok(Self {
+                    source,
+                    context: Arc::new(Mutex::new(Context {
+                        native_view: None,
+                        gui_context: None,
+                        messages: vec!(),
+                        width: width.clone(),
+                        height: height.clone()
+                    })),
+                    width,
+                    height,
+                    developer_mode: builder.developer_mode,
+                    cb
+                })
+            },
+            _ => Err(())
         }
     }
 }
@@ -109,15 +155,21 @@ impl Editor for WebViewEditor {
             context.gui_context = Some(gui_context.clone());
             let inner_context = self.context.clone();
             let size = (self.width.load(Ordering::Relaxed), self.height.load(Ordering::Relaxed));
-            context.native_view = Some(NativeWebView::new(parent.handle, self.source.clone(), size, Box::new(move |msg| {
-                if let Ok(mut context) = inner_context.lock() {
-                    if let Ok(json_value) = serde_json::from_str(msg) {
-                        context.messages.push(json_value);
+            context.native_view = Some(NativeWebView::new(
+                parent.handle,
+                self.source.clone(),
+                size,
+                self.developer_mode,
+                Box::new(move |msg| {
+                    if let Ok(mut context) = inner_context.lock() {
+                        if let Ok(json_value) = serde_json::from_str(msg) {
+                            context.messages.push(json_value);
+                        }
+                    } else {
+                        panic!("Invalid JSON from web view: {}.", msg);
                     }
-                } else {
-                    panic!("Invalid JSON from web view: {}.", msg);
-                }
-            })));
+                })
+            ));
         }
         
         // setup timer callback
@@ -147,7 +199,7 @@ impl Editor for WebViewEditor {
     }
     
     fn param_values_changed(&self) {
-        // TODO: decide if this should be implemented.
+        // TODO: decide if this should do something.
         // might not be that useful if there's no info about which parameter changed?
     }
 }

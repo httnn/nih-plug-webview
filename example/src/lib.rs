@@ -89,8 +89,11 @@ impl Plugin for Gain {
 
     fn editor(&self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let params = self.params.clone();
-        Some(Box::new(
-          WebViewEditor::new(HTMLSource::String(include_str!("gui.html")), (200, 200), move |ctx, setter| {
+        let editor = WebViewEditorBuilder::new()
+        .with_source(HTMLSource::String(include_str!("gui.html")))
+        .with_size(200, 200)
+        .with_developer_mode(true)
+        .with_callback(move |ctx, setter| {
             for msg in ctx.consume_json() {
                 // you'll probably want to parse events into structs with Serde in a real scenario
                 match msg.get("type").unwrap().as_str().unwrap() {
@@ -122,9 +125,15 @@ impl Plugin for Gain {
                 "param": "gain",
                 "value": params.gain.normalized_value()
             }));
-          })
-        ))
-      }
+        })
+        .build();
+            
+        if let Ok(editor) = editor {
+            Some(Box::new(editor))
+        } else {
+            panic!("Failed to construct editor.")
+        }
+    }
 
     fn deactivate(&mut self) {}
 }

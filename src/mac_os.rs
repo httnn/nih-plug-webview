@@ -99,14 +99,15 @@ fn set_config_value(config: &WebViewConfig, key: &str, value: bool) {
 }
 
 impl NativeWebView {
-    pub fn new(handle: RawWindowHandle, source: Arc<HTMLSource>, size: (u32, u32), callback: Callback) -> Self {
+    pub fn new(handle: RawWindowHandle, source: Arc<HTMLSource>, initial_size: (u32, u32), developer_mode: bool, message_callback: Callback) -> Self {
         if let RawWindowHandle::AppKit(handle) = handle {
             // setup config
             let mut webview_config = WebViewConfig::default();
             webview_config.handlers.push("main".to_owned());
 
-            // TODO: expose via the public API
-            webview_config.enable_developer_extras();
+            if developer_mode {
+                webview_config.enable_developer_extras();
+            }
 
             set_config_value(&webview_config, "fullScreenEnabled", true);
             set_config_value(&webview_config, "DOMPasteAllowed", true);
@@ -114,13 +115,13 @@ impl NativeWebView {
             webview_config.add_user_script(include_str!("mac_script.js"), InjectAt::Start, true);
 
             // construct webview
-            let view = WebView::with(webview_config, WebViewInstance { message_callback: callback });
+            let view = WebView::with(webview_config, WebViewInstance { message_callback });
             view.set_translates_autoresizing_mask_into_constraints(true);
             view.set_frame(Rect {
                 top: 0.0,
                 left: 0.0,
-                width: size.0 as f64,
-                height: size.1 as f64
+                width: initial_size.0 as f64,
+                height: initial_size.1 as f64
             });
 
             // add webview to parent view (received via raw window handle)
@@ -135,12 +136,8 @@ impl NativeWebView {
 
             // set HTML content
             match *source {
-                HTMLSource::String(html) => {
-                    view.load_html(html);
-                },
-                HTMLSource::URL(url) => {
-                    view.load_url(url);
-                },
+                HTMLSource::String(html) => view.load_html(html),
+                HTMLSource::URL(url) => view.load_url(url)
             }
 
             NativeWebView { native_view: view }
