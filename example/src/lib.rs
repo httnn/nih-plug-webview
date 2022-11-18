@@ -109,7 +109,7 @@ impl Plugin for Gain {
                         ctx.resize((width as u32, height as u32));
                     },
                     "init" => {
-                        ctx.send_json(json!({
+                        let _ = ctx.send_json(json!({
                             "type": "set_size",
                             "width": ctx.width.load(Ordering::Relaxed),
                             "height": ctx.height.load(Ordering::Relaxed)
@@ -120,7 +120,7 @@ impl Plugin for Gain {
             }
 
             // sends the param change each frame which is wasteful but good enough for this mvp
-            ctx.send_json(json!({
+            let _ = ctx.send_json(json!({
                 "type": "param_change",
                 "param": "gain",
                 "value": params.gain.normalized_value()
