@@ -11,6 +11,8 @@ Help is welcome!
 
 [Check the example.](https://github.com/maxjvh/nih-plug-webview/blob/main/example/src/lib.rs#L90-L136)
 
+Build the example with `cargo xtask bundle gain` in the `example` folder.
+
 ## TODO (at least)
 - [ ] Windows support
 - [ ] Linux support
