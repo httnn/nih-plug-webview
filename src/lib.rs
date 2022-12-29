@@ -4,7 +4,12 @@ mod mac_os;
 #[cfg(target_os = "windows")]
 mod windows;
 
+#[cfg(target_os = "macos")]
 use self::mac_os::{Timer};
+
+#[cfg(target_os = "windows")]
+use self::windows::{Timer};
+
 use nih_plug::prelude::{Editor, GuiContext, ParamSetter};
 use raw_window_handle::RawWindowHandle;
 use serde_json::Value;
@@ -177,8 +182,10 @@ impl Editor for WebViewEditor {
             let inner_context = self.context.clone();
 
             let mut webview_builder = match parent.handle {
+                #[cfg(target_os = "macos")]
                 RawWindowHandle::AppKit(handle) => WebViewBuilder::new(Window { ns_view: handle.ns_view }).unwrap(),
-                RawWindowHandle::Win32(_handle) => todo!("Windows implementation."),
+                #[cfg(target_os = "windows")]
+                RawWindowHandle::Win32(_handle) => WebViewBuilder::new(Window { hwnd: _handle.hwnd}).unwrap(),
                 _ => panic!(),
             };
 
