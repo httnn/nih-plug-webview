@@ -1,5 +1,5 @@
 window.sendToPlugin = function (msg) {
-  webkit.messageHandlers.main.postMessage(JSON.stringify(msg));
+  window.ipc.postMessage(JSON.stringify(msg));
 }
 
 window.onPluginMessage = function() {};
