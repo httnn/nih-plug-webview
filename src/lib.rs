@@ -1,30 +1,19 @@
-#[cfg(target_os = "macos")]
-mod mac_os;
-
-#[cfg(target_os = "windows")]
-mod windows;
-
-#[cfg(target_os = "macos")]
-use self::mac_os::{Timer};
-
-#[cfg(target_os = "windows")]
-use self::windows::{Timer};
-
 use nih_plug::prelude::{Editor, GuiContext, ParamSetter};
 use raw_window_handle::RawWindowHandle;
 use serde_json::Value;
 use std::{
     sync::{
         atomic::{AtomicU32, Ordering},
-        Arc, Mutex,
+        Arc,
     }, path::PathBuf,
 };
 use wry::{
     webview::{WebView, WebViewBuilder, Window, FileDropEvent},
 };
 
+use parking_lot::Mutex;
+
 struct Instance {
-    _timer: Box<Timer>,
     context: Arc<Mutex<Context>>,
 }
 
@@ -33,9 +22,7 @@ unsafe impl Sync for Instance {}
 
 impl Drop for Instance {
     fn drop(&mut self) {
-        if let Ok(mut context) = self.context.lock() {
-            context.webview = None;
-        }
+        self.context.lock().webview = None;
     }
 }
 
@@ -48,7 +35,6 @@ pub enum WebviewMessage {
 pub struct Context {
     webview: Option<WebView>,
     pub gui_context: Option<Arc<dyn GuiContext>>,
-    messages: Vec<WebviewMessage>,
     pub width: Arc<AtomicU32>,
     pub height: Arc<AtomicU32>,
 }
@@ -76,16 +62,9 @@ impl Context {
         }
         Err(None)
     }
-
-    pub fn consume_json(&mut self) -> Vec<WebviewMessage> {
-        // TODO: there has to be a better way
-        let msgs = self.messages.clone();
-        self.messages.clear();
-        msgs
-    }
 }
 
-type MessageCallback = dyn Fn(&mut Context, ParamSetter) + 'static + Send + Sync;
+type MessageCallback = dyn Fn(WebviewMessage, &mut Context) + 'static + Send + Sync;
 
 pub struct WebViewEditorBuilder {
     source: Option<Arc<HTMLSource>>,
@@ -116,7 +95,7 @@ impl WebViewEditorBuilder {
 
     pub fn with_callback<F>(&mut self, callback: F) -> &mut Self
     where
-        F: Fn(&mut Context, ParamSetter) + 'static + Send + Sync,
+        F: Fn(WebviewMessage, &mut Context) + 'static + Send + Sync,
     {
         self.cb = Some(Arc::new(callback));
         self
@@ -157,7 +136,6 @@ impl WebViewEditor {
                     context: Arc::new(Mutex::new(Context {
                         webview: None,
                         gui_context: None,
-                        messages: vec![],
                         width: width.clone(),
                         height: height.clone(),
                     })),
@@ -183,10 +161,13 @@ impl Editor for WebViewEditor {
     ) -> Box<dyn std::any::Any + Send> {
         // setup native web view
         {
-            let mut context = self.context.lock().unwrap();
+            let mut context = self.context.lock();
             context.gui_context = Some(gui_context.clone());
-            let file_drop_context = self.context.clone();
-            let ipc_context = self.context.clone();
+            let file_drop_cb = self.cb.clone();
+            let ipc_cb = self.cb.clone();
+
+            let file_drop_ctx = self.context.clone();
+            let ipc_ctx = self.context.clone();
 
             let mut webview_builder = match parent.handle {
                 #[cfg(target_os = "macos")]
@@ -202,17 +183,15 @@ impl Editor for WebViewEditor {
             .with_initialization_script(include_str!("script.js"))
             .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
                 if let FileDropEvent::Dropped(path) = msg {
-                    if let Ok(mut context) = file_drop_context.lock() {
-                        context.messages.push(WebviewMessage::FileDropped(path));
-                    }
+                    let mut ctx = file_drop_ctx.lock();
+                    (*file_drop_cb)(WebviewMessage::FileDropped(path), &mut ctx);
                 }
                 false
             })
             .with_ipc_handler(move |_: &Window, msg: String| {
-                if let Ok(mut context) = ipc_context.lock() {
-                    if let Ok(json_value) = serde_json::from_str(&msg) {
-                        context.messages.push(WebviewMessage::JSON(json_value));
-                    }
+                if let Ok(json_value) = serde_json::from_str(&msg) {
+                    let mut ctx = ipc_ctx.lock();
+                    (*ipc_cb)(WebviewMessage::JSON(json_value), &mut ctx);
                 } else {
                     panic!("Invalid JSON from web view: {}.", msg);
                 }
@@ -226,21 +205,9 @@ impl Editor for WebViewEditor {
                 }.unwrap().build().unwrap()
             );
         }
-
-        // setup timer callback
-        let context = self.context.clone();
-        let cb = self.cb.clone();
-        let gui_ctx = gui_context.clone();
-        let timer_callback = move || {
-            if let Ok(mut s) = context.lock() {
-                let setter = ParamSetter::new(&*gui_ctx);
-                cb(&mut s, setter);
-            }
-        };
         
         Box::new(Instance {
-            context: self.context.clone(),
-            _timer: Timer::new(1.0 / 60.0, Box::new(timer_callback)),
+            context: self.context.clone()
         })
     }
 
