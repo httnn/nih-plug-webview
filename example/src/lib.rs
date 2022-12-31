@@ -95,28 +95,34 @@ impl Plugin for Gain {
         .with_developer_mode(true)
         .with_callback(move |ctx, setter| {
             for msg in ctx.consume_json() {
-                // you'll probably want to parse events into structs with Serde in a real scenario
-                match msg.get("type").unwrap().as_str().unwrap() {
-                    "set_gain" => {
-                        let value = msg.get("value").unwrap().as_f64().unwrap() as f32;
-                        setter.begin_set_parameter(&params.gain);
-                        setter.set_parameter_normalized(&params.gain, value);
-                        setter.end_set_parameter(&params.gain);
-                    },
-                    "set_size" => {
-                        let width = msg.get("width").unwrap().as_u64().unwrap();
-                        let height = msg.get("height").unwrap().as_u64().unwrap();
-                        ctx.resize((width as u32, height as u32));
-                    },
-                    "init" => {
-                        let _ = ctx.send_json(json!({
-                            "type": "set_size",
-                            "width": ctx.width.load(Ordering::Relaxed),
-                            "height": ctx.height.load(Ordering::Relaxed)
-                        }));
+                match msg {
+                    WebviewMessage::JSON(msg) => {
+                        match msg.get("type").unwrap().as_str().unwrap() {
+                            "set_gain" => {
+                                let value = msg.get("value").unwrap().as_f64().unwrap() as f32;
+                                setter.begin_set_parameter(&params.gain);
+                                setter.set_parameter_normalized(&params.gain, value);
+                                setter.end_set_parameter(&params.gain);
+                            },
+                            "set_size" => {
+                                let width = msg.get("width").unwrap().as_u64().unwrap();
+                                let height = msg.get("height").unwrap().as_u64().unwrap();
+                                ctx.resize((width as u32, height as u32));
+                            },
+                            "init" => {
+                                let _ = ctx.send_json(json!({
+                                    "type": "set_size",
+                                    "width": ctx.width.load(Ordering::Relaxed),
+                                    "height": ctx.height.load(Ordering::Relaxed)
+                                }));
+                            }
+                            _ => {}
+                        }
                     }
-                    _ => {}
+                    WebviewMessage::FileDropped(_) => todo!(),
                 }
+                // you'll probably want to parse events into structs with Serde in a real scenario
+
             }
 
             // sends the param change each frame which is wasteful but good enough for this mvp
