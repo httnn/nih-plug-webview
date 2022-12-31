@@ -1205,6 +1205,7 @@ dependencies = [
  "nih_plug",
  "raw-window-handle 0.4.3",
  "serde_json",
+ "winapi",
  "wry",
 ]
 
@@ -2557,7 +2558,6 @@ checksum = "f40009d85759725a34da6d89a94e63d7bdc50a862acf0dbc7c8e488f1edcb6f5"
 [[package]]
 name = "wry"
 version = "0.23.4"
-source = "git+https://github.com/maxjvh/wry#af57633860b8766a28c6a04c68ec945991ad9260"
 dependencies = [
  "base64",
  "block",
