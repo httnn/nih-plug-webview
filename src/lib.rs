@@ -17,10 +17,10 @@ use std::{
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc, Mutex,
-    },
+    }, path::PathBuf,
 };
 use wry::{
-    webview::{WebView, WebViewBuilder, Window},
+    webview::{WebView, WebViewBuilder, Window, FileDropEvent},
 };
 
 struct Instance {
@@ -39,10 +39,16 @@ impl Drop for Instance {
     }
 }
 
+#[derive(Clone)]
+pub enum WebviewMessage {
+    JSON(Value),
+    FileDropped(Vec<PathBuf>)
+}
+
 pub struct Context {
     webview: Option<WebView>,
     pub gui_context: Option<Arc<dyn GuiContext>>,
-    messages: Vec<Value>,
+    messages: Vec<WebviewMessage>,
     pub width: Arc<AtomicU32>,
     pub height: Arc<AtomicU32>,
 }
@@ -71,7 +77,7 @@ impl Context {
         Err(None)
     }
 
-    pub fn consume_json(&mut self) -> Vec<Value> {
+    pub fn consume_json(&mut self) -> Vec<WebviewMessage> {
         // TODO: there has to be a better way
         let msgs = self.messages.clone();
         self.messages.clear();
@@ -179,7 +185,8 @@ impl Editor for WebViewEditor {
         {
             let mut context = self.context.lock().unwrap();
             context.gui_context = Some(gui_context.clone());
-            let inner_context = self.context.clone();
+            let file_drop_context = self.context.clone();
+            let ipc_context = self.context.clone();
 
             let mut webview_builder = match parent.handle {
                 #[cfg(target_os = "macos")]
@@ -193,10 +200,18 @@ impl Editor for WebViewEditor {
             .with_accept_first_mouse(true)
             .with_devtools(self.developer_mode)
             .with_initialization_script(include_str!("script.js"))
+            .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
+                if let FileDropEvent::Dropped(path) = msg {
+                    if let Ok(mut context) = file_drop_context.lock() {
+                        context.messages.push(WebviewMessage::FileDropped(path));
+                    }
+                }
+                false
+            })
             .with_ipc_handler(move |_: &Window, msg: String| {
-                if let Ok(mut context) = inner_context.lock() {
+                if let Ok(mut context) = ipc_context.lock() {
                     if let Ok(json_value) = serde_json::from_str(&msg) {
-                        context.messages.push(json_value);
+                        context.messages.push(WebviewMessage::JSON(json_value));
                     }
                 } else {
                     panic!("Invalid JSON from web view: {}.", msg);
