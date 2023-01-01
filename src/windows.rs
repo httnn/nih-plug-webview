@@ -8,36 +8,36 @@ use winapi::shared::basetsd::{ UINT_PTR };
 use winapi::shared::minwindef::{ UINT, DWORD };
 use super::HTMLSource;
 use std::io::prelude::*;
-const WIN_FRAME_TIMER: usize = 4242;
+
 pub struct Timer {
-    handle: HWND,
-    idevent: usize,
+    handle: *mut c_void,
+    id_event: Option<*mut c_void>,
     func: Box<dyn FnMut()>
 }
+
 impl Timer {
-    pub fn new(handle: HWND, interval: f64, func: Box<dyn Fn()>) -> Box<Self> {
+    pub fn new(handle: *mut c_void, interval: f64, func: Box<dyn FnMut()>) -> Arc<Self> {
+        let mut timer = Arc::new(Self { handle, func, id_event: None });
+        timer.id_event = Arc::as_ptr(&timer);
         unsafe {
-            SetTimer(handle, 1234, 100, Some(callback));
+            SetTimer(handle as HWND, timer.id_event, interval, callback);
         }
-        Box::new(Self { handle: handle, idevent: 1234,  func:Box::new(|| {})})
+        timer
     }
 }
 
 impl Drop for Timer {
     fn drop(&mut self) {
-        unsafe { KillTimer(self.handle, self.idevent); }
+        unsafe { KillTimer(self.handle, self.id_event.unwrap()); }
     }
 }
 
 unsafe impl Sync for Timer {}
 unsafe impl Send for Timer {}
 
-extern "system" fn callback(hwnd: HWND, uMsg: UINT, idEvent: UINT_PTR, dwTime: DWORD){
-    pub static mut _clb: *mut UINT = 0 as *const UINT as *mut UINT;
+extern "C" fn callback(hwnd: HWND, u_msg: UINT, id_event: UINT_PTR, dw_time: DWORD){
     unsafe{
-        let timer = _clb as *mut Timer;
+        let timer = id_event as *mut Timer;
         ((*timer).func)();
     }
 }
-
-type Callback = Box<dyn Fn(&str)>;
