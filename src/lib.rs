@@ -238,17 +238,19 @@ impl Editor for WebViewEditor {
             }
         };
 
-
-        let mut hwnd = match parent.handle {
+        #[cfg(target_os = "windows")]
+        let hwnd = match parent.handle {
             #[cfg(target_os = "windows")]
             RawWindowHandle::Win32(_handle) => _handle.hwnd,
             _ => panic!()
         };
 
-        let test= hwnd as winapi::shared::windef::HWND;
         Box::new(Instance {
             context: self.context.clone(),
-            _timer: Timer::new(test,1.0 / 60.0, Box::new(timer_callback)),
+            #[cfg(target_os = "macos")]
+            _timer: Timer::new(1.0 / 60.0, Box::new(timer_callback)),
+            #[cfg(target_os = "windows")]
+            _timer: Timer::new(hwnd as winapi::shared::windef::HWND, 1.0 / 60.0, Box::new(timer_callback)),
         })
     }
 
