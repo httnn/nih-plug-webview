@@ -24,7 +24,7 @@ use wry::{
 };
 
 struct Instance {
-    _timer: Box<Timer>,
+    _timer: Arc<Timer>,
     context: Arc<Mutex<Context>>,
 }
 

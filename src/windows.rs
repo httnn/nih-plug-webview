@@ -18,9 +18,9 @@ pub struct Timer {
 impl Timer {
     pub fn new(handle: *mut c_void, interval: f64, func: Box<dyn FnMut()>) -> Arc<Self> {
         let mut timer = Arc::new(Self { handle, func, id_event: None });
-        timer.id_event = Arc::as_ptr(&timer);
+        timer.id_event = Some(Arc::as_ptr(&timer) as *mut c_void);
         unsafe {
-            SetTimer(handle as HWND, timer.id_event, interval, callback);
+            SetTimer(handle as HWND, timer.id_event.unwrap(), interval as u32, callback);
         }
         timer
     }
@@ -28,7 +28,7 @@ impl Timer {
 
 impl Drop for Timer {
     fn drop(&mut self) {
-        unsafe { KillTimer(self.handle, self.id_event.unwrap()); }
+        unsafe { KillTimer(self.handle as HWND, self.id_event.unwrap()); }
     }
 }
 
