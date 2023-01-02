@@ -24,7 +24,7 @@ use wry::{
 };
 
 struct Instance {
-    _timer: Arc<Timer>,
+    _timer: Box<Timer>,
     context: Arc<Mutex<Context>>,
 }
 
@@ -92,6 +92,7 @@ pub struct WebViewEditorBuilder {
     size: Option<(u32, u32)>,
     cb: Option<Arc<MessageCallback>>,
     developer_mode: bool,
+    background_color: Option<(u8, u8, u8, u8)>
 }
 
 impl WebViewEditorBuilder {
@@ -101,7 +102,13 @@ impl WebViewEditorBuilder {
             size: None,
             cb: None,
             developer_mode: false,
+            background_color: None
         }
+    }
+
+    pub fn with_background_color(&mut self, background_color: (u8, u8, u8, u8)) -> &mut Self {
+        self.background_color = Some(background_color);
+        self
     }
 
     pub fn with_source(&mut self, source: HTMLSource) -> &mut Self {
@@ -139,6 +146,7 @@ pub struct WebViewEditor {
     height: Arc<AtomicU32>,
     cb: Arc<MessageCallback>,
     developer_mode: bool,
+    background_color: Option<(u8, u8, u8, u8)>
 }
 
 pub enum HTMLSource {
@@ -164,6 +172,7 @@ impl WebViewEditor {
                     width,
                     height,
                     developer_mode: builder.developer_mode,
+                    background_color: builder.background_color,
                     cb,
                 })
             }
@@ -217,6 +226,10 @@ impl Editor for WebViewEditor {
                     panic!("Invalid JSON from web view: {}.", msg);
                 }
             });
+
+            if let Some(color) = self.background_color {
+                webview_builder = webview_builder.with_background_color(color);
+            }
 
             context.webview = Some(
                 match self.source.as_ref() {

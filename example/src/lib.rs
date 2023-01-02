@@ -92,6 +92,7 @@ impl Plugin for Gain {
         let editor = WebViewEditorBuilder::new()
         .with_source(HTMLSource::String(include_str!("gui.html")))
         .with_size(200, 200)
+        .with_background_color((150, 150, 150, 255))
         .with_developer_mode(true)
         .with_callback(move |ctx, setter| {
             for msg in ctx.consume_json() {
