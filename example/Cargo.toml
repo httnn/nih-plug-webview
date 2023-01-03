@@ -8,9 +8,6 @@ license = "ISC"
 [lib]
 crate-type = ["cdylib"]
 
-[workspace]
-members = ["xtask"]
-
 [dependencies]
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", features = ["assert_process_allocs"] }
 nih_plug_webview = { path = ".." }

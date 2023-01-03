@@ -7,6 +7,12 @@ license = "ISC"
 
 description = "An adapter to use webview GUIs with NIH-plug"
 
+[workspace]
+members = [
+  "example",
+  "xtask"
+]
+
 [dependencies]
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git" }
 serde_json = "1.0"
