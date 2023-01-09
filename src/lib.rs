@@ -263,7 +263,7 @@ impl Editor for WebViewEditor {
             #[cfg(target_os = "macos")]
             _timer: Timer::new(1.0 / 60.0, Box::new(timer_callback)),
             #[cfg(target_os = "windows")]
-            _timer: Timer::new(hwnd, 1.0 / 60.0, Box::new(timer_callback)),
+            _timer: Timer::new(hwnd, 17.0, Box::new(timer_callback)),
         })
     }
 
