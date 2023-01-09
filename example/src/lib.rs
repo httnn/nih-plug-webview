@@ -130,7 +130,7 @@ impl Plugin for Gain {
             let _ = ctx.send_json(json!({
                 "type": "param_change",
                 "param": "gain",
-                "value": params.gain.value()
+                "value": params.gain.unmodulated_normalized_value()
             }));
         })
         .build();
