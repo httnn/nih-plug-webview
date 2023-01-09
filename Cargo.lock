@@ -2646,7 +2646,7 @@ checksum = "f40009d85759725a34da6d89a94e63d7bdc50a862acf0dbc7c8e488f1edcb6f5"
 [[package]]
 name = "wry"
 version = "0.23.4"
-source = "git+https://github.com/maxjvh/wry#82a054369568f920e046c6c2fb859ae52bbc436d"
+source = "git+https://github.com/maxjvh/wry#02345214584a9c36b6275979a29232d3cb8845ce"
 dependencies = [
  "base64",
  "block",

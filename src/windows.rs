@@ -2,7 +2,7 @@ use std::ffi::c_void;
 use std::sync::Arc;
 use std::{ ptr, mem };
 use raw_window_handle::RawWindowHandle;
-use winapi::shared::windef::HWND;
+use winapi::shared::windef::{HWND, HWND__};
 use winapi::um::winuser::{ SetTimer, WM_TIMER, KillTimer };
 use winapi::shared::basetsd::{ UINT_PTR };
 use winapi::shared::minwindef::{ UINT, DWORD };
@@ -16,28 +16,41 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn new(handle: *mut c_void, interval: f64, func: Box<dyn FnMut()>) -> Arc<Self> {
-        let mut timer = Arc::new(Self { handle, func, id_event: None });
-        timer.id_event = Some(Arc::as_ptr(&timer) as *mut c_void);
+    pub fn new(handle: *mut c_void, interval: f64, func: Box<dyn FnMut()>) -> Box<Self> {
+        let mut timer =  Box::new(Self { handle, func, id_event: None });
+        timer.id_event = Some(&mut timer as *mut _ as *mut c_void);
+
+        let ptr_num_transmute = unsafe { std::mem::transmute::<*mut c_void, UINT_PTR>(timer.id_event.unwrap()) };
+
         unsafe {
-            SetTimer(handle as HWND, timer.id_event.unwrap(), interval as u32, callback);
+            let test = SetTimer(handle as HWND, ptr_num_transmute, interval as u32, Some(callback));
+            // std::fs::write("D:/VST/debug/new.txt", test.to_string()).expect("Unable to write file");
         }
+
         timer
+       
     }
 }
 
 impl Drop for Timer {
     fn drop(&mut self) {
-        unsafe { KillTimer(self.handle as HWND, self.id_event.unwrap()); }
+        unsafe { 
+            let ptr_num_transmute = unsafe { std::mem::transmute::<*mut c_void, usize>(self.id_event.unwrap()) };
+
+            KillTimer(self.handle as HWND, ptr_num_transmute); 
+        }
     }
 }
 
 unsafe impl Sync for Timer {}
 unsafe impl Send for Timer {}
 
-extern "C" fn callback(hwnd: HWND, u_msg: UINT, id_event: UINT_PTR, dw_time: DWORD){
+extern "system" fn callback(hwnd: HWND, u_msg: UINT, id_event: UINT_PTR, dw_time: DWORD){
+    let ptr_num_transmute = unsafe { std::mem::transmute::<UINT_PTR, *mut c_void>(id_event) };
+
     unsafe{
-        let timer = id_event as *mut Timer;
+        let timer = ptr_num_transmute as *mut Timer;
         ((*timer).func)();
+        // std::fs::write("D:/VST/debug/callback.txt", id_event.to_string()).expect("Unable to write file");
     }
 }
