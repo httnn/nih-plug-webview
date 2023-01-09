@@ -1,17 +1,4 @@
-#[cfg(target_os = "macos")]
-mod mac_os;
-
-#[cfg(target_os = "windows")]
-mod windows;
-
-#[cfg(target_os = "macos")]
-use self::mac_os::{Timer};
-
-#[cfg(target_os = "windows")]
-use self::windows::{Timer};
-
 use nih_plug::prelude::{Editor, GuiContext, ParamSetter};
-use raw_window_handle::RawWindowHandle;
 use serde_json::Value;
 use std::{
     sync::{
@@ -24,7 +11,6 @@ use wry::{
 };
 
 struct Instance {
-    _timer: Box<Timer>,
     context: Arc<Mutex<Context>>,
 }
 
@@ -190,81 +176,55 @@ impl Editor for WebViewEditor {
         parent: nih_plug::prelude::ParentWindowHandle,
         gui_context: Arc<dyn GuiContext>,
     ) -> Box<dyn std::any::Any + Send> {
-        // setup native web view
-        {
-            let mut context = self.context.lock().unwrap();
-            context.gui_context = Some(gui_context.clone());
-            let file_drop_context = self.context.clone();
-            let ipc_context = self.context.clone();
-
-            let mut webview_builder = match parent.handle {
-                #[cfg(target_os = "macos")]
-                RawWindowHandle::AppKit(handle) => WebViewBuilder::new(Window { ns_view: handle.ns_view }).unwrap(),
-                #[cfg(target_os = "windows")]
-                RawWindowHandle::Win32(_handle) => WebViewBuilder::new(Window { hwnd: _handle.hwnd}).unwrap(),
-                _ => panic!(),
-            };
-
-            webview_builder = webview_builder
-            .with_accept_first_mouse(true)
-            .with_devtools(self.developer_mode)
-            .with_initialization_script(include_str!("script.js"))
-            .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
-                if let FileDropEvent::Dropped(path) = msg {
-                    if let Ok(mut context) = file_drop_context.lock() {
-                        context.messages.push(WebviewMessage::FileDropped(path));
-                    }
-                }
-                false
-            })
-            .with_ipc_handler(move |_: &Window, msg: String| {
-                if let Ok(mut context) = ipc_context.lock() {
-                    if let Ok(json_value) = serde_json::from_str(&msg) {
-                        context.messages.push(WebviewMessage::JSON(json_value));
-                    }
-                } else {
-                    panic!("Invalid JSON from web view: {}.", msg);
-                }
-            });
-
-            if let Some(color) = self.background_color {
-                webview_builder = webview_builder.with_background_color(color);
-            }
-
-            context.webview = Some(
-                match self.source.as_ref() {
-                    HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
-                    HTMLSource::URL(url) => webview_builder.with_url(*url),
-                    
-                }.unwrap().build().unwrap()
-            );
-        }
-
-        // setup timer callback
-        let context = self.context.clone();
-        let cb = self.cb.clone();
+        let mut context = self.context.lock().unwrap();
+        context.gui_context = Some(gui_context.clone());
+        let file_drop_context = self.context.clone();
+        let ipc_context = self.context.clone();
+        let timer_context = self.context.clone();
         let gui_ctx = gui_context.clone();
-        let timer_callback = move || {
-            if let Ok(mut s) = context.lock() {
+        let cb = self.cb.clone();
+
+        let mut webview_builder = WebViewBuilder::new(Window::new(parent.handle)).unwrap()
+        .with_accept_first_mouse(true)
+        .with_devtools(self.developer_mode)
+        .with_initialization_script(include_str!("script.js"))
+        .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
+            if let FileDropEvent::Dropped(path) = msg {
+                if let Ok(mut context) = file_drop_context.lock() {
+                    context.messages.push(WebviewMessage::FileDropped(path));
+                }
+            }
+            false
+        })
+        .with_ipc_handler(move |_: &Window, msg: String| {
+            if let Ok(mut context) = ipc_context.lock() {
+                if let Ok(json_value) = serde_json::from_str(&msg) {
+                    context.messages.push(WebviewMessage::JSON(json_value));
+                }
+            } else {
+                panic!("Invalid JSON from web view: {}.", msg);
+            }
+        })
+        .with_ui_timer(move || {
+            if let Ok(mut s) = timer_context.lock() {
                 let setter = ParamSetter::new(&*gui_ctx);
                 cb(&mut s, setter);
             }
-        };
+        });
 
-        #[cfg(target_os = "windows")]
-        let hwnd = match parent.handle {
-            #[cfg(target_os = "windows")]
-            RawWindowHandle::Win32(_handle) => _handle.hwnd,
-            _ => panic!()
-        };
+        if let Some(color) = self.background_color {
+            webview_builder = webview_builder.with_background_color(color);
+        }
 
-        Box::new(Instance {
-            context: self.context.clone(),
-            #[cfg(target_os = "macos")]
-            _timer: Timer::new(1.0 / 60.0, Box::new(timer_callback)),
-            #[cfg(target_os = "windows")]
-            _timer: Timer::new(hwnd, 17.0, Box::new(timer_callback)),
-        })
+        context.webview = Some(
+            match self.source.as_ref() {
+                HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
+                HTMLSource::URL(url) => webview_builder.with_url(*url),
+                
+            }.unwrap().build().unwrap()
+        );
+
+        Box::new(Instance { context: self.context.clone() })
     }
 
     fn size(&self) -> (u32, u32) {
