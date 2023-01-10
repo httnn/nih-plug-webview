@@ -38,6 +38,7 @@
 
   Gain:
   <input style="margin: 1rem;" class="slider" type="range" min="0" max="1" step="0.01" />
+  <span class="value-display"></span>
 
   <div class="corner-resize">
     <svg viewBox="0 0 10 10" width="10" height="10">
@@ -52,13 +53,14 @@
     slider.addEventListener('input', e => {
       e.preventDefault();
       console.log(e.target.value);
-      sendToPlugin({ type: 'set_gain', value: Number(e.target.value) });
+      sendToPlugin({ type: 'SetGain', value: Number(e.target.value) });
     });
 
     window.onPluginMessage = msg => {
       switch (msg.type) {
         case 'param_change': {
           slider.value = msg.value;
+          document.querySelector('.value-display').textContent = msg.text;
           break;
         }
         case 'set_size': {
@@ -92,11 +94,11 @@
         const height = Math.max(100, startSize.height + deltaY);
         size.width = width;
         size.height = height;
-        sendToPlugin({ type: 'set_size', width, height });
+        sendToPlugin({ type: 'SetSize', width, height });
       }
     });
 
-    sendToPlugin({ type: 'init' });
+    sendToPlugin({ type: 'Init' });
   </script>
 </body>
 </html>

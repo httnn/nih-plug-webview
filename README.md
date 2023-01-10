@@ -7,7 +7,7 @@ Contributions are welcome!
 
 ## Usage
 
-[Check the example.](https://github.com/maxjvh/nih-plug-webview/blob/main/example/src/lib.rs#L90-L136)
+[Check out the example.](https://github.com/maxjvh/nih-plug-webview/blob/main/example/src/)
 
 Build the example with `cargo xtask bundle gain` in the `example` folder.
 

@@ -77,7 +77,7 @@ type MessageCallback = dyn Fn(&mut Context, ParamSetter) + 'static + Send + Sync
 pub struct WebViewEditorBuilder {
     source: Option<Arc<HTMLSource>>,
     size: Option<(u32, u32)>,
-    cb: Option<Arc<MessageCallback>>,
+    event_loop_callback: Option<Arc<MessageCallback>>,
     developer_mode: bool,
     background_color: Option<(u8, u8, u8, u8)>,
 }
@@ -100,11 +100,11 @@ impl WebViewEditorBuilder {
         self
     }
 
-    pub fn with_callback<F>(&mut self, callback: F) -> &mut Self
+    pub fn with_event_loop<F>(&mut self, callback: F) -> &mut Self
     where
         F: Fn(&mut Context, ParamSetter) + 'static + Send + Sync,
     {
-        self.cb = Some(Arc::new(callback));
+        self.event_loop_callback = Some(Arc::new(callback));
         self
     }
 
@@ -123,7 +123,7 @@ pub struct WebViewEditor {
     source: Arc<HTMLSource>,
     width: Arc<AtomicU32>,
     height: Arc<AtomicU32>,
-    cb: Arc<MessageCallback>,
+    event_loop_callback: Arc<MessageCallback>,
     developer_mode: bool,
     background_color: Option<(u8, u8, u8, u8)>,
 }
@@ -135,8 +135,8 @@ pub enum HTMLSource {
 
 impl WebViewEditor {
     pub fn new(builder: &WebViewEditorBuilder) -> Result<Self, ()> {
-        match (builder.source.clone(), builder.cb.clone(), builder.size) {
-            (Some(source), Some(cb), Some(size)) => {
+        match (builder.source.clone(), builder.event_loop_callback.clone(), builder.size) {
+            (Some(source), Some(event_loop_callback), Some(size)) => {
                 let width = Arc::new(AtomicU32::new(size.0));
                 let height = Arc::new(AtomicU32::new(size.1));
                 Ok(Self {
@@ -152,7 +152,7 @@ impl WebViewEditor {
                     height,
                     developer_mode: builder.developer_mode,
                     background_color: builder.background_color,
-                    cb,
+                    event_loop_callback,
                 })
             }
             _ => Err(()),
@@ -175,7 +175,7 @@ impl Editor for WebViewEditor {
         let ipc_context = self.context.clone();
         let timer_context = self.context.clone();
         let gui_ctx = gui_context.clone();
-        let cb = self.cb.clone();
+        let event_loop_callback = self.event_loop_callback.clone();
 
         let mut webview_builder = WebViewBuilder::new(Window::new(parent.handle))
             .unwrap()
@@ -200,7 +200,7 @@ impl Editor for WebViewEditor {
             .with_ui_timer(move || {
                 let mut context = timer_context.lock();
                 let setter = ParamSetter::new(&*gui_ctx);
-                cb(&mut context, setter);
+                event_loop_callback(&mut context, setter);
             });
 
         if let Some(color) = self.background_color {
