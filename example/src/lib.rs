@@ -140,7 +140,7 @@ impl Plugin for Gain {
                                 panic!("Invalid action received from web UI.")
                             }
                         }
-                        WebviewMessage::FileDropped(_) => todo!(),
+                        WebviewMessage::FileDropped(path) => println!("File dropped: {:?}", path)
                     }
                 }
 
