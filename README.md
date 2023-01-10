@@ -1,11 +1,9 @@
 # nih-plug-webview
 
-**WIP**
+Implements a webview editor for [nih-plug](https://github.com/robbert-vdh/nih-plug) using [a custom fork](https://github.com/maxjvh/wry) of [wry](https://github.com/tauri-apps/wry).
+It currently works on macOS and Windows.
 
-Implements a webview editor for [nih-plug](https://github.com/robbert-vdh/nih-plug).
-Currently only contains a macOS implementation.
-
-Help is welcome!
+Contributions are welcome!
 
 ## Usage
 
@@ -13,8 +11,7 @@ Help is welcome!
 
 Build the example with `cargo xtask bundle gain` in the `example` folder.
 
-## TODO (at least)
-- [ ] Windows support
-- [ ] Linux support
+## TODO
+- [ ] Linux support (if at all possible)
 - [ ] docs
 - [ ] testing
