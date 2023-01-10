@@ -108,7 +108,7 @@ impl Plugin for Gain {
                             "set_size" => {
                                 let width = msg.get("width").unwrap().as_u64().unwrap();
                                 let height = msg.get("height").unwrap().as_u64().unwrap();
-                                ctx.resize((width as u32, height as u32));
+                                ctx.resize(width as u32, height as u32);
                             },
                             "init" => {
                                 let _ = ctx.send_json(json!({

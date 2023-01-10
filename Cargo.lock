@@ -1203,6 +1203,7 @@ name = "nih_plug_webview"
 version = "0.0.0"
 dependencies = [
  "nih_plug",
+ "parking_lot",
  "serde_json",
  "wry",
 ]

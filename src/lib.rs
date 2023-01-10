@@ -1,14 +1,14 @@
 use nih_plug::prelude::{Editor, GuiContext, ParamSetter};
+use parking_lot::Mutex;
 use serde_json::Value;
 use std::{
+    path::PathBuf,
     sync::{
         atomic::{AtomicU32, Ordering},
-        Arc, Mutex,
-    }, path::PathBuf,
+        Arc,
+    },
 };
-use wry::{
-    webview::{WebView, WebViewBuilder, Window, FileDropEvent},
-};
+use wry::webview::{FileDropEvent, WebView, WebViewBuilder, Window};
 
 struct Instance {
     context: Arc<Mutex<Context>>,
@@ -19,16 +19,15 @@ unsafe impl Sync for Instance {}
 
 impl Drop for Instance {
     fn drop(&mut self) {
-        if let Ok(mut context) = self.context.lock() {
-            context.webview = None;
-        }
+        let mut context = self.context.lock();
+        context.webview = None;
     }
 }
 
 #[derive(Clone)]
 pub enum WebviewMessage {
     JSON(Value),
-    FileDropped(Vec<PathBuf>)
+    FileDropped(Vec<PathBuf>),
 }
 
 pub struct Context {
@@ -40,27 +39,28 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn resize(&mut self, size: (u32, u32)) {
+    pub fn resize(&mut self, width: u32, height: u32) {
         match self.gui_context.as_ref() {
             Some(gui_ctx) => {
-                self.width.store(size.0, Ordering::Relaxed);
-                self.height.store(size.1, Ordering::Relaxed);
+                self.width.store(width, Ordering::Relaxed);
+                self.height.store(height, Ordering::Relaxed);
                 gui_ctx.request_resize();
             }
             _ => {}
         }
     }
 
-    pub fn send_json(&mut self, json: Value) -> Result<(), Option<Value>> {
+    pub fn send_json(&mut self, json: Value) -> Result<(), String> {
         if let Some(view) = &self.webview {
             if let Ok(json_str) = serde_json::to_string(&json) {
-                view.evaluate_script(&format!("onPluginMessageInternal(`{}`);", json_str)).unwrap();
+                view.evaluate_script(&format!("onPluginMessageInternal(`{}`);", json_str))
+                    .unwrap();
                 return Ok(());
             } else {
-                return Err(Some(json));
+                return Err("Can't convert JSON to string.".to_owned());
             }
         }
-        Err(None)
+        Err("Webview not open.".to_owned())
     }
 
     pub fn consume_json(&mut self) -> Vec<WebviewMessage> {
@@ -72,25 +72,18 @@ impl Context {
 }
 
 type MessageCallback = dyn Fn(&mut Context, ParamSetter) + 'static + Send + Sync;
-
+ 
+#[derive(Default)]
 pub struct WebViewEditorBuilder {
     source: Option<Arc<HTMLSource>>,
     size: Option<(u32, u32)>,
     cb: Option<Arc<MessageCallback>>,
     developer_mode: bool,
-    background_color: Option<(u8, u8, u8, u8)>
+    background_color: Option<(u8, u8, u8, u8)>,
 }
 
 impl WebViewEditorBuilder {
-    pub fn new() -> Self {
-        Self {
-            source: None,
-            size: None,
-            cb: None,
-            developer_mode: false,
-            background_color: None
-        }
-    }
+    pub fn new() -> Self { Default::default() }
 
     pub fn with_background_color(&mut self, background_color: (u8, u8, u8, u8)) -> &mut Self {
         self.background_color = Some(background_color);
@@ -132,7 +125,7 @@ pub struct WebViewEditor {
     height: Arc<AtomicU32>,
     cb: Arc<MessageCallback>,
     developer_mode: bool,
-    background_color: Option<(u8, u8, u8, u8)>
+    background_color: Option<(u8, u8, u8, u8)>,
 }
 
 pub enum HTMLSource {
@@ -176,7 +169,7 @@ impl Editor for WebViewEditor {
         parent: nih_plug::prelude::ParentWindowHandle,
         gui_context: Arc<dyn GuiContext>,
     ) -> Box<dyn std::any::Any + Send> {
-        let mut context = self.context.lock().unwrap();
+        let mut context = self.context.lock();
         context.gui_context = Some(gui_context.clone());
         let file_drop_context = self.context.clone();
         let ipc_context = self.context.clone();
@@ -184,33 +177,31 @@ impl Editor for WebViewEditor {
         let gui_ctx = gui_context.clone();
         let cb = self.cb.clone();
 
-        let mut webview_builder = WebViewBuilder::new(Window::new(parent.handle)).unwrap()
-        .with_accept_first_mouse(true)
-        .with_devtools(self.developer_mode)
-        .with_initialization_script(include_str!("script.js"))
-        .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
-            if let FileDropEvent::Dropped(path) = msg {
-                if let Ok(mut context) = file_drop_context.lock() {
+        let mut webview_builder = WebViewBuilder::new(Window::new(parent.handle))
+            .unwrap()
+            .with_accept_first_mouse(true)
+            .with_devtools(self.developer_mode)
+            .with_initialization_script(include_str!("script.js"))
+            .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
+                if let FileDropEvent::Dropped(path) = msg {
+                    let mut context = file_drop_context.lock();
                     context.messages.push(WebviewMessage::FileDropped(path));
                 }
-            }
-            false
-        })
-        .with_ipc_handler(move |_: &Window, msg: String| {
-            if let Ok(mut context) = ipc_context.lock() {
+                false
+            })
+            .with_ipc_handler(move |_: &Window, msg: String| {
+                let mut context = ipc_context.lock();
                 if let Ok(json_value) = serde_json::from_str(&msg) {
                     context.messages.push(WebviewMessage::JSON(json_value));
+                } else {
+                    panic!("Invalid JSON from web view: {}.", msg);
                 }
-            } else {
-                panic!("Invalid JSON from web view: {}.", msg);
-            }
-        })
-        .with_ui_timer(move || {
-            if let Ok(mut s) = timer_context.lock() {
+            })
+            .with_ui_timer(move || {
+                let mut context = timer_context.lock();
                 let setter = ParamSetter::new(&*gui_ctx);
-                cb(&mut s, setter);
-            }
-        });
+                cb(&mut context, setter);
+            });
 
         if let Some(color) = self.background_color {
             webview_builder = webview_builder.with_background_color(color);
@@ -220,11 +211,15 @@ impl Editor for WebViewEditor {
             match self.source.as_ref() {
                 HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
                 HTMLSource::URL(url) => webview_builder.with_url(*url),
-                
-            }.unwrap().build().unwrap()
+            }
+            .unwrap()
+            .build()
+            .unwrap(),
         );
 
-        Box::new(Instance { context: self.context.clone() })
+        Box::new(Instance {
+            context: self.context.clone(),
+        })
     }
 
     fn size(&self) -> (u32, u32) {
