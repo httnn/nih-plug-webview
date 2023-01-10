@@ -25,7 +25,7 @@ impl Drop for Instance {
 }
 
 #[derive(Clone)]
-pub enum WebviewMessage {
+pub enum WebviewEvent {
     JSON(Value),
     FileDropped(Vec<PathBuf>),
 }
@@ -33,7 +33,7 @@ pub enum WebviewMessage {
 pub struct Context {
     webview: Option<WebView>,
     pub gui_context: Option<Arc<dyn GuiContext>>,
-    messages: Vec<WebviewMessage>,
+    events: Vec<WebviewEvent>,
     pub width: Arc<AtomicU32>,
     pub height: Arc<AtomicU32>,
 }
@@ -63,10 +63,10 @@ impl Context {
         Err("Webview not open.".to_owned())
     }
 
-    pub fn consume_json(&mut self) -> Vec<WebviewMessage> {
+    pub fn consume_events(&mut self) -> Vec<WebviewEvent> {
         // TODO: there has to be a better way
-        let msgs = self.messages.clone();
-        self.messages.clear();
+        let msgs = self.events.clone();
+        self.events.clear();
         msgs
     }
 }
@@ -144,7 +144,7 @@ impl WebViewEditor {
                     context: Arc::new(Mutex::new(Context {
                         webview: None,
                         gui_context: None,
-                        messages: vec![],
+                        events: vec![],
                         width: width.clone(),
                         height: height.clone(),
                     })),
@@ -185,14 +185,14 @@ impl Editor for WebViewEditor {
             .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
                 if let FileDropEvent::Dropped(path) = msg {
                     let mut context = file_drop_context.lock();
-                    context.messages.push(WebviewMessage::FileDropped(path));
+                    context.events.push(WebviewEvent::FileDropped(path));
                 }
                 false
             })
             .with_ipc_handler(move |_: &Window, msg: String| {
                 let mut context = ipc_context.lock();
                 if let Ok(json_value) = serde_json::from_str(&msg) {
-                    context.messages.push(WebviewMessage::JSON(json_value));
+                    context.events.push(WebviewEvent::JSON(json_value));
                 } else {
                     panic!("Invalid JSON from web view: {}.", msg);
                 }

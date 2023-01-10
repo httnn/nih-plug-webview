@@ -115,10 +115,10 @@ impl Plugin for Gain {
             .with_background_color((150, 150, 150, 255))
             .with_developer_mode(true)
             .with_event_loop(move |ctx, setter| {
-                for msg in ctx.consume_json() {
-                    match msg {
-                        WebviewMessage::JSON(msg) => {
-                            if let Ok(action) = serde_json::from_value(msg) {
+                for event in ctx.consume_events() {
+                    match event {
+                        WebviewEvent::JSON(value) => {
+                            if let Ok(action) = serde_json::from_value(value) {
                                 match action {
                                     Action::SetGain { value } => {
                                         setter.begin_set_parameter(&params.gain);
@@ -140,7 +140,7 @@ impl Plugin for Gain {
                                 panic!("Invalid action received from web UI.")
                             }
                         }
-                        WebviewMessage::FileDropped(path) => println!("File dropped: {:?}", path)
+                        WebviewEvent::FileDropped(path) => println!("File dropped: {:?}", path)
                     }
                 }
 
