@@ -2,13 +2,17 @@ use nih_plug::prelude::{Editor, GuiContext, ParamSetter};
 use parking_lot::Mutex;
 use serde_json::Value;
 use std::{
+    borrow::Cow,
     path::PathBuf,
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
     },
 };
-use wry::webview::{FileDropEvent, WebView, WebViewBuilder, Window};
+use wry::{
+    http::{Request, Response},
+    webview::{FileDropEvent, WebView, WebViewBuilder, Window},
+};
 
 struct Instance {
     context: Arc<Mutex<Context>>,
@@ -72,16 +76,19 @@ impl Context {
     }
 }
 
-type MessageCallback = dyn Fn(&mut Context, ParamSetter) + 'static + Send + Sync;
+type EventLoopHandler = dyn Fn(&mut Context, ParamSetter) + 'static + Send + Sync;
+type CustomProtocolHandler =
+    dyn Fn(&Request<Vec<u8>>) -> wry::Result<Response<Cow<'static, [u8]>>> + 'static;
 
 pub struct WebViewEditor {
     context: Arc<Mutex<Context>>,
     source: Arc<HTMLSource>,
     width: Arc<AtomicU32>,
     height: Arc<AtomicU32>,
-    event_loop_callback: Option<Arc<MessageCallback>>,
+    event_loop_callback: Option<Arc<EventLoopHandler>>,
+    custom_protocol: Option<(String, Arc<CustomProtocolHandler>)>,
     developer_mode: bool,
-    background_color: (u8, u8, u8, u8)
+    background_color: (u8, u8, u8, u8),
 }
 
 pub enum HTMLSource {
@@ -107,11 +114,20 @@ impl WebViewEditor {
             developer_mode: false,
             background_color: (255, 255, 255, 255),
             event_loop_callback: None,
+            custom_protocol: None,
         }
     }
 
     pub fn with_background_color(mut self, background_color: (u8, u8, u8, u8)) -> Self {
         self.background_color = background_color;
+        self
+    }
+
+    pub fn with_custom_protocol<F>(mut self, name: String, handler: F) -> Self
+    where
+        F: Fn(&Request<Vec<u8>>) -> wry::Result<Response<Cow<'static, [u8]>>> + 'static,
+    {
+        self.custom_protocol = Some((name, Arc::new(handler)));
         self
     }
 
@@ -174,6 +190,14 @@ impl Editor for WebViewEditor {
                 let setter = ParamSetter::new(&*gui_ctx);
                 cb(&mut context, setter);
             }));
+        }
+
+        if let Some(custom_protocol) = self.custom_protocol.as_ref() {
+            let handler = custom_protocol.1.clone();
+            webview_builder.webview.custom_protocols.push((
+                custom_protocol.0.to_owned(),
+                Box::new(move |request| handler(request)),
+            ));
         }
 
         let webview = match self.source.as_ref() {
