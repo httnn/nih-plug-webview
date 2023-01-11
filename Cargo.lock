@@ -1159,7 +1159,7 @@ checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 [[package]]
 name = "nih_plug"
 version = "0.0.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#27acce323783fb9b3ec32c474107ba6698550a50"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#e5a26ac19928bdf65fa9e8f05c810d05b997e14b"
 dependencies = [
  "anyhow",
  "anymap",
@@ -1192,7 +1192,7 @@ dependencies = [
 [[package]]
 name = "nih_plug_derive"
 version = "0.1.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#27acce323783fb9b3ec32c474107ba6698550a50"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#e5a26ac19928bdf65fa9e8f05c810d05b997e14b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1212,7 +1212,7 @@ dependencies = [
 [[package]]
 name = "nih_plug_xtask"
 version = "0.1.0"
-source = "git+https://github.com/robbert-vdh/nih-plug.git#27acce323783fb9b3ec32c474107ba6698550a50"
+source = "git+https://github.com/robbert-vdh/nih-plug.git#e5a26ac19928bdf65fa9e8f05c810d05b997e14b"
 dependencies = [
  "anyhow",
  "goblin",
@@ -1317,9 +1317,9 @@ dependencies = [
 
 [[package]]
 name = "object"
-version = "0.30.1"
+version = "0.30.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d864c91689fdc196779b98dba0aceac6118594c2df6ee5d943eb6a8df4d107a"
+checksum = "2b8c786513eb403643f2a88c244c2aaa270ef2153f55094587d0c48a3cf22a83"
 dependencies = [
  "memchr",
 ]
@@ -1367,9 +1367,9 @@ dependencies = [
 
 [[package]]
 name = "parking_lot_core"
-version = "0.9.5"
+version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ff9f3fef3968a3ec5945535ed654cb38ff72d7495a25619e2247fb15a2ed9ba"
+checksum = "ba1ef8814b5c993410bb3adfad7a5ed269563e4a2f90c41f5d85be7fb47133bf"
 dependencies = [
  "cfg-if",
  "libc",
@@ -1386,9 +1386,9 @@ checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
 
 [[package]]
 name = "pest"
-version = "2.5.2"
+version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f6e86fb9e7026527a0d46bc308b841d73170ef8f443e1807f6ef88526a816d4"
+checksum = "4257b4a04d91f7e9e6290be5d3da4804dd5784fafde3a497d73eb2b4a158c30a"
 dependencies = [
  "thiserror",
  "ucd-trie",
@@ -2000,8 +2000,8 @@ dependencies = [
 
 [[package]]
 name = "tao"
-version = "0.15.8"
-source = "git+https://github.com/tauri-apps/tao?branch=dev#3cd851d14126c305964b957eeb4f9ed0011d96cb"
+version = "0.16.0"
+source = "git+https://github.com/tauri-apps/tao?branch=dev#6c2718c184aca70c87bd64fa19ff7ae884edf1da"
 dependencies = [
  "bitflags",
  "cairo-rs",
@@ -2045,8 +2045,8 @@ dependencies = [
 
 [[package]]
 name = "tao-macros"
-version = "0.0.0"
-source = "git+https://github.com/tauri-apps/tao?branch=dev#3cd851d14126c305964b957eeb4f9ed0011d96cb"
+version = "0.1.0"
+source = "git+https://github.com/tauri-apps/tao?branch=dev#6c2718c184aca70c87bd64fa19ff7ae884edf1da"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2605,7 +2605,7 @@ checksum = "f40009d85759725a34da6d89a94e63d7bdc50a862acf0dbc7c8e488f1edcb6f5"
 [[package]]
 name = "wry"
 version = "0.23.4"
-source = "git+https://github.com/maxjvh/wry#40c8dc4cab4988f0d3c2a2f6816c29db7b09d340"
+source = "git+https://github.com/maxjvh/wry#6e5e974520afc2b36a412d167f17d3146059b35c"
 dependencies = [
  "base64",
  "block",

@@ -51,6 +51,7 @@ impl Context {
     }
 
     pub fn send_json(&mut self, json: Value) -> Result<(), String> {
+        // TODO: proper error handling
         if let Some(view) = &self.webview {
             if let Ok(json_str) = serde_json::to_string(&json) {
                 view.evaluate_script(&format!("onPluginMessageInternal(`{}`);", json_str))
@@ -72,7 +73,7 @@ impl Context {
 }
 
 type MessageCallback = dyn Fn(&mut Context, ParamSetter) + 'static + Send + Sync;
- 
+
 #[derive(Default)]
 pub struct WebViewEditorBuilder {
     source: Option<Arc<HTMLSource>>,
@@ -83,7 +84,9 @@ pub struct WebViewEditorBuilder {
 }
 
 impl WebViewEditorBuilder {
-    pub fn new() -> Self { Default::default() }
+    pub fn new() -> Self {
+        Default::default()
+    }
 
     pub fn with_background_color(&mut self, background_color: (u8, u8, u8, u8)) -> &mut Self {
         self.background_color = Some(background_color);
@@ -135,7 +138,11 @@ pub enum HTMLSource {
 
 impl WebViewEditor {
     pub fn new(builder: &WebViewEditorBuilder) -> Result<Self, ()> {
-        match (builder.source.clone(), builder.event_loop_callback.clone(), builder.size) {
+        match (
+            builder.source.clone(),
+            builder.event_loop_callback.clone(),
+            builder.size,
+        ) {
             (Some(source), Some(event_loop_callback), Some(size)) => {
                 let width = Arc::new(AtomicU32::new(size.0));
                 let height = Arc::new(AtomicU32::new(size.1));
@@ -178,7 +185,7 @@ impl Editor for WebViewEditor {
         let event_loop_callback = self.event_loop_callback.clone();
 
         let mut webview_builder = WebViewBuilder::new(Window::new(parent.handle))
-            .unwrap()
+            .unwrap() // always returns Ok()
             .with_accept_first_mouse(true)
             .with_devtools(self.developer_mode)
             .with_initialization_script(include_str!("script.js"))
@@ -207,15 +214,14 @@ impl Editor for WebViewEditor {
             webview_builder = webview_builder.with_background_color(color);
         }
 
-        context.webview = Some(
-            match self.source.as_ref() {
-                HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
-                HTMLSource::URL(url) => webview_builder.with_url(*url),
-            }
-            .unwrap()
-            .build()
-            .unwrap(),
-        );
+        let webview = match self.source.as_ref() {
+            HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
+            HTMLSource::URL(url) => webview_builder.with_url(*url),
+        }
+        .unwrap() // always returns Ok(())
+        .build();
+
+        context.webview = Some(webview.unwrap_or_else(|_| panic!("Failed to construct webview.")));
 
         Box::new(Instance {
             context: self.context.clone(),
@@ -234,8 +240,9 @@ impl Editor for WebViewEditor {
         return false;
     }
 
-    fn param_values_changed(&self) {
-        // TODO: decide if this should do something.
-        // might not be that useful if there's no info about which parameter changed?
-    }
+    fn param_values_changed(&self) {}
+
+    fn param_value_changed(&self, id: &str, normalized_value: f32) {}
+
+    fn param_modulation_changed(&self, _id: &str, _modulation_offset: f32) {}
 }
