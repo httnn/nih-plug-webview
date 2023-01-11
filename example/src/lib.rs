@@ -109,9 +109,7 @@ impl Plugin for Gain {
     fn editor(&self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let params = self.params.clone();
         let gain_value_changed = self.params.gain_value_changed.clone();
-        let editor = WebViewEditorBuilder::new()
-            .with_source(HTMLSource::String(include_str!("gui.html")))
-            .with_size(200, 200)
+        let editor = WebViewEditor::new(HTMLSource::String(include_str!("gui.html")), (200, 200))
             .with_background_color((150, 150, 150, 255))
             .with_developer_mode(true)
             .with_event_loop(move |ctx, setter| {
@@ -152,14 +150,9 @@ impl Plugin for Gain {
                         "text": params.gain.to_string()
                     }));
                 }
-            })
-            .build();
+            });
 
-        if let Ok(editor) = editor {
-            Some(Box::new(editor))
-        } else {
-            panic!("Failed to construct editor.")
-        }
+        Some(Box::new(editor))
     }
 
     fn deactivate(&mut self) {}

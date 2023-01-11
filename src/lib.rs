@@ -74,61 +74,14 @@ impl Context {
 
 type MessageCallback = dyn Fn(&mut Context, ParamSetter) + 'static + Send + Sync;
 
-#[derive(Default)]
-pub struct WebViewEditorBuilder {
-    source: Option<Arc<HTMLSource>>,
-    size: Option<(u32, u32)>,
-    event_loop_callback: Option<Arc<MessageCallback>>,
-    developer_mode: bool,
-    background_color: Option<(u8, u8, u8, u8)>,
-}
-
-impl WebViewEditorBuilder {
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    pub fn with_background_color(&mut self, background_color: (u8, u8, u8, u8)) -> &mut Self {
-        self.background_color = Some(background_color);
-        self
-    }
-
-    pub fn with_source(&mut self, source: HTMLSource) -> &mut Self {
-        self.source = Some(Arc::new(source));
-        self
-    }
-
-    pub fn with_size(&mut self, width: u32, height: u32) -> &mut Self {
-        self.size = Some((width, height));
-        self
-    }
-
-    pub fn with_event_loop<F>(&mut self, callback: F) -> &mut Self
-    where
-        F: Fn(&mut Context, ParamSetter) + 'static + Send + Sync,
-    {
-        self.event_loop_callback = Some(Arc::new(callback));
-        self
-    }
-
-    pub fn with_developer_mode(&mut self, mode: bool) -> &mut Self {
-        self.developer_mode = mode;
-        self
-    }
-
-    pub fn build(&self) -> Result<WebViewEditor, ()> {
-        WebViewEditor::new(&self)
-    }
-}
-
 pub struct WebViewEditor {
     context: Arc<Mutex<Context>>,
     source: Arc<HTMLSource>,
     width: Arc<AtomicU32>,
     height: Arc<AtomicU32>,
-    event_loop_callback: Arc<MessageCallback>,
+    event_loop_callback: Option<Arc<MessageCallback>>,
     developer_mode: bool,
-    background_color: Option<(u8, u8, u8, u8)>,
+    background_color: (u8, u8, u8, u8)
 }
 
 pub enum HTMLSource {
@@ -137,33 +90,42 @@ pub enum HTMLSource {
 }
 
 impl WebViewEditor {
-    pub fn new(builder: &WebViewEditorBuilder) -> Result<Self, ()> {
-        match (
-            builder.source.clone(),
-            builder.event_loop_callback.clone(),
-            builder.size,
-        ) {
-            (Some(source), Some(event_loop_callback), Some(size)) => {
-                let width = Arc::new(AtomicU32::new(size.0));
-                let height = Arc::new(AtomicU32::new(size.1));
-                Ok(Self {
-                    source,
-                    context: Arc::new(Mutex::new(Context {
-                        webview: None,
-                        gui_context: None,
-                        events: vec![],
-                        width: width.clone(),
-                        height: height.clone(),
-                    })),
-                    width,
-                    height,
-                    developer_mode: builder.developer_mode,
-                    background_color: builder.background_color,
-                    event_loop_callback,
-                })
-            }
-            _ => Err(()),
+    pub fn new(source: HTMLSource, size: (u32, u32)) -> Self {
+        let width = Arc::new(AtomicU32::new(size.0));
+        let height = Arc::new(AtomicU32::new(size.1));
+        Self {
+            source: Arc::new(source),
+            context: Arc::new(Mutex::new(Context {
+                webview: None,
+                gui_context: None,
+                events: vec![],
+                width: width.clone(),
+                height: height.clone(),
+            })),
+            width,
+            height,
+            developer_mode: false,
+            background_color: (255, 255, 255, 255),
+            event_loop_callback: None,
         }
+    }
+
+    pub fn with_background_color(mut self, background_color: (u8, u8, u8, u8)) -> Self {
+        self.background_color = background_color;
+        self
+    }
+
+    pub fn with_event_loop<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(&mut Context, ParamSetter) + 'static + Send + Sync,
+    {
+        self.event_loop_callback = Some(Arc::new(callback));
+        self
+    }
+
+    pub fn with_developer_mode(mut self, mode: bool) -> Self {
+        self.developer_mode = mode;
+        self
     }
 }
 
@@ -204,21 +166,21 @@ impl Editor for WebViewEditor {
                     panic!("Invalid JSON from web view: {}.", msg);
                 }
             })
-            .with_ui_timer(move || {
+            .with_background_color(self.background_color);
+
+        if let Some(cb) = event_loop_callback {
+            webview_builder.webview.ui_timer = Some(Box::new(move || {
                 let mut context = timer_context.lock();
                 let setter = ParamSetter::new(&*gui_ctx);
-                event_loop_callback(&mut context, setter);
-            });
-
-        if let Some(color) = self.background_color {
-            webview_builder = webview_builder.with_background_color(color);
+                cb(&mut context, setter);
+            }));
         }
 
         let webview = match self.source.as_ref() {
             HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
             HTMLSource::URL(url) => webview_builder.with_url(*url),
         }
-        .unwrap() // always returns Ok(())
+        .unwrap()
         .build();
 
         context.webview = Some(webview.unwrap_or_else(|_| panic!("Failed to construct webview.")));
