@@ -14,6 +14,8 @@ use wry::{
     webview::{FileDropEvent, WebView, WebViewBuilder, Window},
 };
 
+pub use wry::http;
+
 struct Instance {
     context: Arc<Mutex<Context>>,
 }
