@@ -3,7 +3,7 @@ use nih_plug::prelude::*;
 use nih_plug_webview::*;
 use serde::Deserialize;
 use serde_json::json;
-use std::sync::atomic::{Ordering, AtomicBool};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 struct Gain {
@@ -22,7 +22,7 @@ enum Action {
 struct GainParams {
     #[id = "gain"]
     pub gain: FloatParam,
-    gain_value_changed: Arc<AtomicBool>
+    gain_value_changed: Arc<AtomicBool>,
 }
 
 impl Default for Gain {
@@ -57,7 +57,7 @@ impl Default for GainParams {
             .with_value_to_string(formatters::v2s_f32_gain_to_db(2))
             .with_string_to_value(formatters::s2v_f32_gain_to_db())
             .with_callback(param_callback.clone()),
-            gain_value_changed
+            gain_value_changed,
         }
     }
 }
@@ -113,7 +113,7 @@ impl Plugin for Gain {
             .with_background_color((150, 150, 150, 255))
             .with_developer_mode(true)
             .with_event_loop(move |ctx, setter| {
-                for event in ctx.consume_events() {
+                while let Some(event) = ctx.next_event() {
                     match event {
                         WebviewEvent::JSON(value) => {
                             if let Ok(action) = serde_json::from_value(value) {
@@ -138,7 +138,8 @@ impl Plugin for Gain {
                                 panic!("Invalid action received from web UI.")
                             }
                         }
-                        WebviewEvent::FileDropped(path) => println!("File dropped: {:?}", path)
+                        WebviewEvent::FileDropped(path) => println!("File dropped: {:?}", path),
+                        _ => {}
                     }
                 }
 

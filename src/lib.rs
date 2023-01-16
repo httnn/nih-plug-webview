@@ -7,7 +7,7 @@ use std::{
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
-    },
+    }, collections::VecDeque,
 };
 use wry::{
     http::{Request, Response},
@@ -30,16 +30,17 @@ impl Drop for Instance {
     }
 }
 
-#[derive(Clone)]
 pub enum WebviewEvent {
     JSON(Value),
+    FileHovered(Vec<PathBuf>),
     FileDropped(Vec<PathBuf>),
+    FileDropCancelled,
 }
 
 pub struct Context {
     webview: Option<WebView>,
     pub gui_context: Option<Arc<dyn GuiContext>>,
-    events: Vec<WebviewEvent>,
+    events: VecDeque<WebviewEvent>,
     pub width: Arc<AtomicU32>,
     pub height: Arc<AtomicU32>,
 }
@@ -70,11 +71,8 @@ impl Context {
         Err("Webview not open.".to_owned())
     }
 
-    pub fn consume_events(&mut self) -> Vec<WebviewEvent> {
-        // TODO: there has to be a better way
-        let msgs = self.events.clone();
-        self.events.clear();
-        msgs
+    pub fn next_event(&mut self) -> Option<WebviewEvent> {
+        self.events.pop_front()
     }
 }
 
@@ -107,7 +105,7 @@ impl WebViewEditor {
             context: Arc::new(Mutex::new(Context {
                 webview: None,
                 gui_context: None,
-                events: vec![],
+                events: VecDeque::new(),
                 width: width.clone(),
                 height: height.clone(),
             })),
@@ -170,16 +168,21 @@ impl Editor for WebViewEditor {
             .with_devtools(self.developer_mode)
             .with_initialization_script(include_str!("script.js"))
             .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
-                if let FileDropEvent::Dropped(path) = msg {
-                    let mut context = file_drop_context.lock();
-                    context.events.push(WebviewEvent::FileDropped(path));
-                }
+                let mut context = file_drop_context.lock();
+                context.events.push_back(
+                    match msg {
+                        FileDropEvent::Hovered(paths) => WebviewEvent::FileHovered(paths),
+                        FileDropEvent::Dropped(paths) => WebviewEvent::FileDropped(paths),
+                        FileDropEvent::Cancelled => WebviewEvent::FileDropCancelled,
+                        _ => todo!("Can this ever happen?"),
+                    }
+                );
                 false
             })
             .with_ipc_handler(move |_: &Window, msg: String| {
                 let mut context = ipc_context.lock();
                 if let Ok(json_value) = serde_json::from_str(&msg) {
-                    context.events.push(WebviewEvent::JSON(json_value));
+                    context.events.push_back(WebviewEvent::JSON(json_value));
                 } else {
                     panic!("Invalid JSON from web view: {}.", msg);
                 }
