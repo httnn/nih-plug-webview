@@ -171,8 +171,8 @@ impl Editor for WebViewEditor {
                 let mut context = file_drop_context.lock();
                 context.events.push_back(
                     match msg {
-                        FileDropEvent::Hovered(paths) => WebviewEvent::FileHovered(paths),
-                        FileDropEvent::Dropped(paths) => WebviewEvent::FileDropped(paths),
+                        FileDropEvent::Hovered { paths, .. } => WebviewEvent::FileHovered(paths),
+                        FileDropEvent::Dropped { paths, .. } => WebviewEvent::FileDropped(paths),
                         FileDropEvent::Cancelled => WebviewEvent::FileDropCancelled,
                         _ => todo!("Can this ever happen?"),
                     }

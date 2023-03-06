@@ -64,6 +64,7 @@ impl Default for GainParams {
 
 impl Plugin for Gain {
     type BackgroundTask = ();
+    type SysExMessage = ();
 
     const NAME: &'static str = "Gain";
     const VENDOR: &'static str = "Moist Plugins GmbH";
@@ -72,21 +73,26 @@ impl Plugin for Gain {
 
     const VERSION: &'static str = "0.0.1";
 
-    const DEFAULT_INPUT_CHANNELS: u32 = 2;
-    const DEFAULT_OUTPUT_CHANNELS: u32 = 2;
-
-    const DEFAULT_AUX_INPUTS: Option<AuxiliaryIOConfig> = None;
-    const DEFAULT_AUX_OUTPUTS: Option<AuxiliaryIOConfig> = None;
+    const AUDIO_IO_LAYOUTS: &'static [AudioIOLayout] = &[
+        AudioIOLayout {
+            main_input_channels: NonZeroU32::new(2),
+            main_output_channels: NonZeroU32::new(2),
+            aux_input_ports: &[],
+            aux_output_ports: &[],
+            names: PortNames::const_default(),
+        },
+        AudioIOLayout {
+            main_input_channels: NonZeroU32::new(1),
+            main_output_channels: NonZeroU32::new(1),
+            ..AudioIOLayout::const_default()
+        },
+    ];
 
     const MIDI_INPUT: MidiConfig = MidiConfig::None;
     const SAMPLE_ACCURATE_AUTOMATION: bool = true;
 
     fn params(&self) -> Arc<dyn Params> {
         self.params.clone()
-    }
-
-    fn accepts_bus_config(&self, config: &BusConfig) -> bool {
-        config.num_input_channels == config.num_output_channels && config.num_input_channels > 0
     }
 
     fn process(
@@ -174,7 +180,7 @@ impl ClapPlugin for Gain {
 
 impl Vst3Plugin for Gain {
     const VST3_CLASS_ID: [u8; 16] = *b"GainMoistestPlug";
-    const VST3_CATEGORIES: &'static str = "Fx|Dynamics";
+    const VST3_SUBCATEGORIES: &'static [Vst3SubCategory] = &[Vst3SubCategory::Fx, Vst3SubCategory::Tools];
 }
 
 nih_export_clap!(Gain);
