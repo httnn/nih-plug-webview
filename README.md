@@ -5,6 +5,14 @@ It currently works on macOS and Windows.
 
 Contributions are welcome!
 
+## Features
+- send arbitrary JSON values back and forth between the webview using Serde
+- resize the plug-in window
+- drag and drop files with full paths
+- specify intercepted keys with modifiers (not implemented for Windows yet)
+- customisable background color for when the view is still loading (avoid initial flash of white)
+- use devtools
+
 ## Usage
 
 [Check out the example.](https://github.com/maxjvh/nih-plug-webview/blob/main/example/src/)

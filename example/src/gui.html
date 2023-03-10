@@ -46,6 +46,10 @@
     </svg>
   </div>
 
+  <pre>
+
+  </pre>
+
   <script>
     let size = { width: 0, height: 0 };
     const slider = document.querySelector('.slider');
@@ -96,6 +100,16 @@
         size.height = height;
         sendToPlugin({ type: 'SetSize', width, height });
       }
+    });
+
+    const log = document.querySelector('pre');
+    let n = 0;
+    window.addEventListener('keydown', e => {
+      log.textContent = `keydown: ${e.key} (${n++})`;
+    });
+
+    window.addEventListener('keyup', e => {
+      log.textContent = `keyup: ${e.key} (${n++})`;
     });
 
     sendToPlugin({ type: 'Init' });

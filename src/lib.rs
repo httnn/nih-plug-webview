@@ -3,11 +3,12 @@ use parking_lot::Mutex;
 use serde_json::Value;
 use std::{
     borrow::Cow,
+    collections::VecDeque,
     path::PathBuf,
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
-    }, collections::VecDeque,
+    },
 };
 use wry::{
     http::{Request, Response},
@@ -69,6 +70,12 @@ impl Context {
             }
         }
         Err("Webview not open.".to_owned())
+    }
+
+    pub fn set_intercepted_keys(&mut self, keys: Vec<&str>) {
+        if let Some(view) = &mut self.webview {
+            view.set_intercepted_keys(keys);
+        }
     }
 
     pub fn next_event(&mut self) -> Option<WebviewEvent> {
@@ -169,14 +176,12 @@ impl Editor for WebViewEditor {
             .with_initialization_script(include_str!("script.js"))
             .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
                 let mut context = file_drop_context.lock();
-                context.events.push_back(
-                    match msg {
-                        FileDropEvent::Hovered { paths, .. } => WebviewEvent::FileHovered(paths),
-                        FileDropEvent::Dropped { paths, .. } => WebviewEvent::FileDropped(paths),
-                        FileDropEvent::Cancelled => WebviewEvent::FileDropCancelled,
-                        _ => todo!("Can this ever happen?"),
-                    }
-                );
+                context.events.push_back(match msg {
+                    FileDropEvent::Hovered { paths, .. } => WebviewEvent::FileHovered(paths),
+                    FileDropEvent::Dropped { paths, .. } => WebviewEvent::FileDropped(paths),
+                    FileDropEvent::Cancelled => WebviewEvent::FileDropCancelled,
+                    _ => todo!("Can this ever happen?"),
+                });
                 false
             })
             .with_ipc_handler(move |_: &Window, msg: String| {
@@ -233,7 +238,7 @@ impl Editor for WebViewEditor {
 
     fn param_values_changed(&self) {}
 
-    fn param_value_changed(&self, id: &str, normalized_value: f32) {}
+    fn param_value_changed(&self, _id: &str, _normalized_value: f32) {}
 
     fn param_modulation_changed(&self, _id: &str, _modulation_offset: f32) {}
 }
