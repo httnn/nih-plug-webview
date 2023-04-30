@@ -17,20 +17,6 @@ use wry::{
 
 pub use wry::http;
 
-struct Instance {
-    context: Arc<Mutex<Context>>,
-}
-
-unsafe impl Send for Instance {}
-unsafe impl Sync for Instance {}
-
-impl Drop for Instance {
-    fn drop(&mut self) {
-        let mut context = self.context.lock();
-        context.webview = None;
-    }
-}
-
 pub enum WebviewEvent {
     JSON(Value),
     FileHovered(Vec<PathBuf>),
@@ -40,7 +26,7 @@ pub enum WebviewEvent {
 
 pub struct Context {
     webview: Option<WebView>,
-    pub gui_context: Option<Arc<dyn GuiContext>>,
+    pub gui_context: Arc<dyn GuiContext>,
     events: VecDeque<WebviewEvent>,
     pub width: Arc<AtomicU32>,
     pub height: Arc<AtomicU32>,
@@ -48,14 +34,9 @@ pub struct Context {
 
 impl Context {
     pub fn resize(&mut self, width: u32, height: u32) {
-        match self.gui_context.as_ref() {
-            Some(gui_ctx) => {
-                self.width.store(width, Ordering::Relaxed);
-                self.height.store(height, Ordering::Relaxed);
-                gui_ctx.request_resize();
-            }
-            _ => {}
-        }
+        self.width.store(width, Ordering::Relaxed);
+        self.height.store(height, Ordering::Relaxed);
+        self.gui_context.request_resize();
     }
 
     pub fn send_json(&mut self, json: Value) -> Result<(), String> {
@@ -83,12 +64,14 @@ impl Context {
     }
 }
 
+unsafe impl Send for Context {}
+unsafe impl Sync for Context {}
+
 type EventLoopHandler = dyn Fn(&mut Context, ParamSetter) + 'static + Send + Sync;
 type CustomProtocolHandler =
     dyn Fn(&Request<Vec<u8>>) -> wry::Result<Response<Cow<'static, [u8]>>> + 'static;
 
 pub struct WebViewEditor {
-    context: Arc<Mutex<Context>>,
     source: Arc<HTMLSource>,
     width: Arc<AtomicU32>,
     height: Arc<AtomicU32>,
@@ -109,13 +92,6 @@ impl WebViewEditor {
         let height = Arc::new(AtomicU32::new(size.1));
         Self {
             source: Arc::new(source),
-            context: Arc::new(Mutex::new(Context {
-                webview: None,
-                gui_context: None,
-                events: VecDeque::new(),
-                width: width.clone(),
-                height: height.clone(),
-            })),
             width,
             height,
             developer_mode: false,
@@ -161,11 +137,16 @@ impl Editor for WebViewEditor {
         parent: nih_plug::prelude::ParentWindowHandle,
         gui_context: Arc<dyn GuiContext>,
     ) -> Box<dyn std::any::Any + Send> {
-        let mut context = self.context.lock();
-        context.gui_context = Some(gui_context.clone());
-        let file_drop_context = self.context.clone();
-        let ipc_context = self.context.clone();
-        let timer_context = self.context.clone();
+        let context = Arc::new(Mutex::new(Context {
+            webview: None,
+            gui_context: gui_context.clone(),
+            events: VecDeque::new(),
+            width: self.width.clone(),
+            height: self.height.clone(),
+        }));
+        let file_drop_context = context.clone();
+        let ipc_context = context.clone();
+        let timer_context = context.clone();
         let gui_ctx = gui_context.clone();
         let event_loop_callback = self.event_loop_callback.clone();
 
@@ -217,11 +198,9 @@ impl Editor for WebViewEditor {
         .unwrap()
         .build();
 
-        context.webview = Some(webview.unwrap_or_else(|_| panic!("Failed to construct webview.")));
+        context.lock().webview = Some(webview.unwrap_or_else(|_| panic!("Failed to construct webview.")));
 
-        Box::new(Instance {
-            context: self.context.clone(),
-        })
+        Box::new(context)
     }
 
     fn size(&self) -> (u32, u32) {
