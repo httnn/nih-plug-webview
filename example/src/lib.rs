@@ -112,7 +112,7 @@ impl Plugin for Gain {
         ProcessStatus::Normal
     }
 
-    fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
+    fn editor(&self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let params = self.params.clone();
         let gain_value_changed = self.params.gain_value_changed.clone();
         let editor = WebViewEditor::new(HTMLSource::String(include_str!("gui.html")), (200, 200))
