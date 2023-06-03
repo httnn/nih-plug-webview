@@ -12,7 +12,7 @@ use std::{
 };
 use wry::{
     http::{Request, Response},
-    webview::{FileDropEvent, WebView, WebViewBuilder, Window},
+    webview::{FileDropEvent, WebView, WebViewBuilder, Window, WebContext},
 };
 
 pub use wry::http;
@@ -168,11 +168,13 @@ impl Editor for WebViewEditor {
         let timer_context = self.context.clone();
         let gui_ctx = gui_context.clone();
         let event_loop_callback = self.event_loop_callback.clone();
+        let mut web_context = WebContext::new(Some(std::env::temp_dir()));
 
         let mut webview_builder = WebViewBuilder::new(Window::new(parent.handle))
             .unwrap() // always returns Ok()
             .with_accept_first_mouse(true)
             .with_devtools(self.developer_mode)
+            .with_web_context(&mut web_context)
             .with_initialization_script(include_str!("script.js"))
             .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
                 let mut context = file_drop_context.lock();
@@ -217,7 +219,7 @@ impl Editor for WebViewEditor {
         .unwrap()
         .build();
 
-        context.webview = Some(webview.unwrap_or_else(|_| panic!("Failed to construct webview.")));
+        context.webview = Some(webview.unwrap_or_else(|e| panic!("Failed to construct webview. {}", e)));
 
         Box::new(Instance {
             context: self.context.clone(),
