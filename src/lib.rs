@@ -1,9 +1,8 @@
+use baseview::{Event, EventStatus, Size, WindowHandle, WindowOpenOptions, WindowScalePolicy};
 use nih_plug::prelude::{Editor, GuiContext, ParamSetter};
-use parking_lot::Mutex;
 use serde_json::Value;
 use std::{
     borrow::Cow,
-    collections::VecDeque,
     path::PathBuf,
     sync::{
         atomic::{AtomicU32, Ordering},
@@ -12,24 +11,14 @@ use std::{
 };
 use wry::{
     http::{Request, Response},
-    webview::{FileDropEvent, WebView, WebViewBuilder, Window, WebContext},
+    webview::{FileDropEvent, WebContext, WebView, WebViewBuilder, Window},
 };
+
+use crossbeam::channel::{unbounded, Receiver};
 
 pub use wry::http;
 
-struct Instance {
-    context: Arc<Mutex<Context>>,
-}
-
-unsafe impl Send for Instance {}
-unsafe impl Sync for Instance {}
-
-impl Drop for Instance {
-    fn drop(&mut self) {
-        let mut context = self.context.lock();
-        context.webview = None;
-    }
-}
+pub use keyboard_types::*;
 
 pub enum WebviewEvent {
     JSON(Value),
@@ -38,61 +27,17 @@ pub enum WebviewEvent {
     FileDropCancelled,
 }
 
-pub struct Context {
-    webview: Option<WebView>,
-    pub gui_context: Option<Arc<dyn GuiContext>>,
-    events: VecDeque<WebviewEvent>,
-    pub width: Arc<AtomicU32>,
-    pub height: Arc<AtomicU32>,
-}
-
-impl Context {
-    pub fn resize(&mut self, width: u32, height: u32) {
-        match self.gui_context.as_ref() {
-            Some(gui_ctx) => {
-                self.width.store(width, Ordering::Relaxed);
-                self.height.store(height, Ordering::Relaxed);
-                gui_ctx.request_resize();
-            }
-            _ => {}
-        }
-    }
-
-    pub fn send_json(&mut self, json: Value) -> Result<(), String> {
-        // TODO: proper error handling
-        if let Some(view) = &self.webview {
-            if let Ok(json_str) = serde_json::to_string(&json) {
-                view.evaluate_script(&format!("onPluginMessageInternal(`{}`);", json_str))
-                    .unwrap();
-                return Ok(());
-            } else {
-                return Err("Can't convert JSON to string.".to_owned());
-            }
-        }
-        Err("Webview not open.".to_owned())
-    }
-
-    pub fn set_intercepted_keys(&mut self, keys: Vec<&str>) {
-        if let Some(view) = &mut self.webview {
-            view.set_intercepted_keys(keys);
-        }
-    }
-
-    pub fn next_event(&mut self) -> Option<WebviewEvent> {
-        self.events.pop_front()
-    }
-}
-
-type EventLoopHandler = dyn Fn(&mut Context, ParamSetter) + 'static + Send + Sync;
+type EventLoopHandler = dyn Fn(&WindowHandler, ParamSetter, &mut baseview::Window) + Send + Sync;
+type KeyboardHandler = dyn Fn(KeyboardEvent) -> bool + Send + Sync;
 type CustomProtocolHandler =
-    dyn Fn(&Request<Vec<u8>>) -> wry::Result<Response<Cow<'static, [u8]>>> + 'static;
+    dyn Fn(&Request<Vec<u8>>) -> wry::Result<Response<Cow<'static, [u8]>>> + Send + Sync;
 
 pub struct WebViewEditor {
-    context: Arc<Mutex<Context>>,
     source: Arc<HTMLSource>,
     width: Arc<AtomicU32>,
     height: Arc<AtomicU32>,
-    event_loop_callback: Option<Arc<EventLoopHandler>>,
+    event_loop_handler: Arc<EventLoopHandler>,
+    keyboard_handler: Arc<KeyboardHandler>,
     custom_protocol: Option<(String, Arc<CustomProtocolHandler>)>,
     developer_mode: bool,
     background_color: (u8, u8, u8, u8),
@@ -109,18 +54,12 @@ impl WebViewEditor {
         let height = Arc::new(AtomicU32::new(size.1));
         Self {
             source: Arc::new(source),
-            context: Arc::new(Mutex::new(Context {
-                webview: None,
-                gui_context: None,
-                events: VecDeque::new(),
-                width: width.clone(),
-                height: height.clone(),
-            })),
             width,
             height,
             developer_mode: false,
             background_color: (255, 255, 255, 255),
-            event_loop_callback: None,
+            event_loop_handler: Arc::new(|_, _, _| {}),
+            keyboard_handler: Arc::new(|_| false),
             custom_protocol: None,
         }
     }
@@ -132,17 +71,20 @@ impl WebViewEditor {
 
     pub fn with_custom_protocol<F>(mut self, name: String, handler: F) -> Self
     where
-        F: Fn(&Request<Vec<u8>>) -> wry::Result<Response<Cow<'static, [u8]>>> + 'static,
+        F: Fn(&Request<Vec<u8>>) -> wry::Result<Response<Cow<'static, [u8]>>>
+            + 'static
+            + Send
+            + Sync,
     {
         self.custom_protocol = Some((name, Arc::new(handler)));
         self
     }
 
-    pub fn with_event_loop<F>(mut self, callback: F) -> Self
+    pub fn with_event_loop<F>(mut self, handler: F) -> Self
     where
-        F: Fn(&mut Context, ParamSetter) + 'static + Send + Sync,
+        F: Fn(&WindowHandler, ParamSetter, &mut baseview::Window) + 'static + Send + Sync,
     {
-        self.event_loop_callback = Some(Arc::new(callback));
+        self.event_loop_handler = Arc::new(handler);
         self
     }
 
@@ -150,80 +92,165 @@ impl WebViewEditor {
         self.developer_mode = mode;
         self
     }
+
+    pub fn with_keyboard_handler<F>(mut self, handler: F) -> Self
+    where
+        F: Fn(KeyboardEvent) -> bool + Send + Sync + 'static,
+    {
+        self.keyboard_handler = Arc::new(handler);
+        self
+    }
 }
 
-unsafe impl Send for WebViewEditor {}
-unsafe impl Sync for WebViewEditor {}
+pub struct WindowHandler {
+    context: Arc<dyn GuiContext>,
+    event_loop_handler: Arc<EventLoopHandler>,
+    keyboard_handler: Arc<KeyboardHandler>,
+    webview: WebView,
+    events_receiver: Receiver<WebviewEvent>,
+    pub width: Arc<AtomicU32>,
+    pub height: Arc<AtomicU32>,
+}
+
+impl WindowHandler {
+    pub fn resize(&self, window: &mut baseview::Window, width: u32, height: u32) {
+        self.width.store(width, Ordering::Relaxed);
+        self.height.store(height, Ordering::Relaxed);
+        self.context.request_resize();
+        window.resize(Size {
+            width: width as f64,
+            height: height as f64,
+        });
+    }
+
+    pub fn send_json(&self, json: Value) -> Result<(), String> {
+        // TODO: proper error handling
+        if let Ok(json_str) = serde_json::to_string(&json) {
+            self.webview
+                .evaluate_script(&format!("onPluginMessageInternal(`{}`);", json_str))
+                .unwrap();
+            return Ok(());
+        } else {
+            return Err("Can't convert JSON to string.".to_owned());
+        }
+    }
+
+    pub fn next_event(&self) -> Result<WebviewEvent, crossbeam::channel::TryRecvError> {
+        self.events_receiver.try_recv()
+    }
+}
+
+impl baseview::WindowHandler for WindowHandler {
+    fn on_frame(&mut self, window: &mut baseview::Window) {
+        let setter = ParamSetter::new(&*self.context);
+        (self.event_loop_handler)(&self, setter, window);
+    }
+
+    fn on_event(&mut self, _window: &mut baseview::Window, event: Event) -> EventStatus {
+        match event {
+            Event::Keyboard(event) => {
+                if (self.keyboard_handler)(event) {
+                    EventStatus::Captured
+                } else {
+                    EventStatus::Ignored
+                }
+            }
+            _ => EventStatus::Ignored,
+        }
+    }
+}
+
+struct Instance {
+    _window_handle: WindowHandle,
+}
+
+unsafe impl Send for Instance {}
 
 impl Editor for WebViewEditor {
     fn spawn(
         &self,
         parent: nih_plug::prelude::ParentWindowHandle,
-        gui_context: Arc<dyn GuiContext>,
+        context: Arc<dyn GuiContext>,
     ) -> Box<dyn std::any::Any + Send> {
-        let mut context = self.context.lock();
-        context.gui_context = Some(gui_context.clone());
-        let file_drop_context = self.context.clone();
-        let ipc_context = self.context.clone();
-        let timer_context = self.context.clone();
-        let gui_ctx = gui_context.clone();
-        let event_loop_callback = self.event_loop_callback.clone();
-        let mut web_context = WebContext::new(Some(std::env::temp_dir()));
+        let options = WindowOpenOptions {
+            scale: WindowScalePolicy::SystemScaleFactor,
+            size: Size {
+                width: self.width.load(Ordering::Relaxed) as f64,
+                height: self.height.load(Ordering::Relaxed) as f64,
+            },
+            title: "Plug-in".to_owned(),
+        };
 
-        let mut webview_builder = WebViewBuilder::new(Window::new(parent.handle))
-            .unwrap() // always returns Ok()
-            .with_accept_first_mouse(true)
-            .with_devtools(self.developer_mode)
-            .with_web_context(&mut web_context)
-            .with_initialization_script(include_str!("script.js"))
-            .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
-                let mut context = file_drop_context.lock();
-                context.events.push_back(match msg {
-                    FileDropEvent::Hovered { paths, .. } => WebviewEvent::FileHovered(paths),
-                    FileDropEvent::Dropped { paths, .. } => WebviewEvent::FileDropped(paths),
-                    FileDropEvent::Cancelled => WebviewEvent::FileDropCancelled,
-                    _ => todo!("Can this ever happen?"),
-                });
-                false
-            })
-            .with_ipc_handler(move |_: &Window, msg: String| {
-                let mut context = ipc_context.lock();
-                if let Ok(json_value) = serde_json::from_str(&msg) {
-                    context.events.push_back(WebviewEvent::JSON(json_value));
-                } else {
-                    panic!("Invalid JSON from web view: {}.", msg);
-                }
-            })
-            .with_background_color(self.background_color);
+        let width = self.width.clone();
+        let height = self.height.clone();
+        let developer_mode = self.developer_mode;
+        let source = self.source.clone();
+        let background_color = self.background_color;
+        let custom_protocol = self.custom_protocol.clone();
+        let event_loop_handler = self.event_loop_handler.clone();
+        let keyboard_handler = self.keyboard_handler.clone();
 
-        if let Some(cb) = event_loop_callback {
-            webview_builder.webview.ui_timer = Some(Box::new(move || {
-                let mut context = timer_context.lock();
-                let setter = ParamSetter::new(&*gui_ctx);
-                cb(&mut context, setter);
-            }));
-        }
+        let window_handle = baseview::Window::open_parented(&parent, options, move |window| {
+            use raw_window_handle::HasRawWindowHandle;
+            let raw_handle = window.raw_window_handle();
 
-        if let Some(custom_protocol) = self.custom_protocol.as_ref() {
-            let handler = custom_protocol.1.clone();
-            webview_builder.webview.custom_protocols.push((
-                custom_protocol.0.to_owned(),
-                Box::new(move |request| handler(request)),
-            ));
-        }
+            let (events_sender, events_receiver) = unbounded();
+            let file_drop_sender = events_sender.clone();
 
-        let webview = match self.source.as_ref() {
-            HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
-            HTMLSource::URL(url) => webview_builder.with_url(*url),
-        }
-        .unwrap()
-        .build();
+            let mut web_context = WebContext::new(Some(std::env::temp_dir()));
 
-        context.webview = Some(webview.unwrap_or_else(|e| panic!("Failed to construct webview. {}", e)));
+            let mut webview_builder = WebViewBuilder::new(Window::new(raw_handle))
+                .unwrap() // always returns Ok()
+                .with_accept_first_mouse(true)
+                .with_devtools(developer_mode)
+                .with_web_context(&mut web_context)
+                .with_initialization_script(include_str!("script.js"))
+                .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
+                    let _ = file_drop_sender.send(match msg {
+                        FileDropEvent::Hovered { paths, .. } => WebviewEvent::FileHovered(paths),
+                        FileDropEvent::Dropped { paths, .. } => WebviewEvent::FileDropped(paths),
+                        FileDropEvent::Cancelled => WebviewEvent::FileDropCancelled,
+                        _ => todo!("Can this ever happen?"),
+                    });
+                    false
+                })
+                .with_ipc_handler(move |_: &Window, msg: String| {
+                    if let Ok(json_value) = serde_json::from_str(&msg) {
+                        let _ = events_sender.send(WebviewEvent::JSON(json_value));
+                    } else {
+                        panic!("Invalid JSON from web view: {}.", msg);
+                    }
+                })
+                .with_background_color(background_color);
 
-        Box::new(Instance {
-            context: self.context.clone(),
-        })
+            if let Some(custom_protocol) = custom_protocol.as_ref() {
+                let handler = custom_protocol.1.clone();
+                webview_builder.webview.custom_protocols.push((
+                    custom_protocol.0.to_owned(),
+                    Box::new(move |request| handler(request)),
+                ));
+            }
+
+            let webview = match source.as_ref() {
+                HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
+                HTMLSource::URL(url) => webview_builder.with_url(*url),
+            }
+            .unwrap()
+            .build();
+
+            WindowHandler {
+                context,
+                event_loop_handler,
+                webview: webview.unwrap_or_else(|e| panic!("Failed to construct webview. {}", e)),
+                events_receiver,
+                keyboard_handler,
+                width,
+                height,
+            }
+        });
+        return Box::new(Instance {
+            _window_handle: window_handle,
+        });
     }
 
     fn size(&self) -> (u32, u32) {

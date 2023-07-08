@@ -118,8 +118,12 @@ impl Plugin for Gain {
         let editor = WebViewEditor::new(HTMLSource::String(include_str!("gui.html")), (200, 200))
             .with_background_color((150, 150, 150, 255))
             .with_developer_mode(true)
-            .with_event_loop(move |ctx, setter| {
-                while let Some(event) = ctx.next_event() {
+            .with_keyboard_handler(move |event| {
+                println!("keyboard event: {event:#?}");
+                false
+            })
+            .with_event_loop(move |ctx, setter, window| {
+                while let Ok(event) = ctx.next_event() {
                     match event {
                         WebviewEvent::JSON(value) => {
                             if let Ok(action) = serde_json::from_value(value) {
@@ -130,7 +134,7 @@ impl Plugin for Gain {
                                         setter.end_set_parameter(&params.gain);
                                     }
                                     Action::SetSize { width, height } => {
-                                        ctx.resize(width, height);
+                                        ctx.resize(window, width, height);
                                     }
                                     Action::Init => {
                                         let _ = ctx.send_json(json!({
@@ -144,7 +148,7 @@ impl Plugin for Gain {
                                 panic!("Invalid action received from web UI.")
                             }
                         }
-                        WebviewEvent::FileDropped(path) => println!("File dropped: {:?}", path),
+                        WebviewEvent::FileDropped(path) => println!("File dropped: {path:?}"),
                         _ => {}
                     }
                 }
