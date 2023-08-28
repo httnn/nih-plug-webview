@@ -137,11 +137,11 @@ impl Plugin for Gain {
                                         ctx.resize(window, width, height);
                                     }
                                     Action::Init => {
-                                        let _ = ctx.send_json(json!({
-                                            "type": "set_size",
-                                            "width": ctx.width.load(Ordering::Relaxed),
-                                            "height": ctx.height.load(Ordering::Relaxed)
-                                        }));
+                                        // let _ = ctx.send_json(json!({
+                                        //     "type": "set_size",
+                                        //     "width": ctx.width.load(Ordering::Relaxed),
+                                        //     "height": ctx.height.load(Ordering::Relaxed)
+                                        // }));
                                     }
                                 }
                             } else {
