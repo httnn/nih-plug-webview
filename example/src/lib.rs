@@ -120,36 +120,51 @@ impl Plugin for Gain {
             .with_developer_mode(true)
             .with_keyboard_handler(move |event| {
                 println!("keyboard event: {event:#?}");
-                false
+                event.key == Key::Escape
+            })
+            .with_mouse_handler(|event| match event {
+                MouseEvent::DragEntered { .. } => {
+                    println!("drag entered");
+                    EventStatus::AcceptDrop(DropEffect::Copy)
+                }
+                MouseEvent::DragMoved { .. } => {
+                    println!("drag moved");
+                    EventStatus::AcceptDrop(DropEffect::Copy)
+                }
+                MouseEvent::DragLeft => {
+                    println!("drag left");
+                    EventStatus::Ignored
+                }
+                MouseEvent::DragDropped { data, .. } => {
+                    if let DropData::Files(files) = data {
+                        println!("drag dropped: {:?}", files);
+                    }
+                    EventStatus::AcceptDrop(DropEffect::Copy)
+                }
+                _ => EventStatus::Ignored,
             })
             .with_event_loop(move |ctx, setter, window| {
-                while let Ok(event) = ctx.next_event() {
-                    match event {
-                        WebviewEvent::JSON(value) => {
-                            if let Ok(action) = serde_json::from_value(value) {
-                                match action {
-                                    Action::SetGain { value } => {
-                                        setter.begin_set_parameter(&params.gain);
-                                        setter.set_parameter_normalized(&params.gain, value);
-                                        setter.end_set_parameter(&params.gain);
-                                    }
-                                    Action::SetSize { width, height } => {
-                                        ctx.resize(window, width, height);
-                                    }
-                                    Action::Init => {
-                                        let _ = ctx.send_json(json!({
-                                            "type": "set_size",
-                                            "width": ctx.width.load(Ordering::Relaxed),
-                                            "height": ctx.height.load(Ordering::Relaxed)
-                                        }));
-                                    }
-                                }
-                            } else {
-                                panic!("Invalid action received from web UI.")
+                while let Ok(value) = ctx.next_event() {
+                    if let Ok(action) = serde_json::from_value(value) {
+                        match action {
+                            Action::SetGain { value } => {
+                                setter.begin_set_parameter(&params.gain);
+                                setter.set_parameter_normalized(&params.gain, value);
+                                setter.end_set_parameter(&params.gain);
+                            }
+                            Action::SetSize { width, height } => {
+                                ctx.resize(window, width, height);
+                            }
+                            Action::Init => {
+                                let _ = ctx.send_json(json!({
+                                    "type": "set_size",
+                                    "width": ctx.width.load(Ordering::Relaxed),
+                                    "height": ctx.height.load(Ordering::Relaxed)
+                                }));
                             }
                         }
-                        WebviewEvent::FileDropped(path) => println!("File dropped: {path:?}"),
-                        _ => {}
+                    } else {
+                        panic!("Invalid action received from web UI.")
                     }
                 }
 

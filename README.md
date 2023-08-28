@@ -6,12 +6,12 @@ Built on top of [baseview](https://github.com/RustAudio/baseview).
 
 ## Current status
 
-I've only been able to test the webview on macOS so far, and while some contributors have helped with the Windows side, it still requires a bit more love (and someone more familiar with Windows API's, so **help is needed**).
+I've only been able to test this on macOS so far on which it has been working very robustly.
+Other contributors have occasionally helped with the Windows side but unfortunately I currently have no idea if it really works or not.
+It would be great to get Windows support up to par, but I'd need someone familiar with Windows APIs to work on that.
 
 On macOS there is an unresolved issue where pressing the escape key in Ableton Live will lead to a crash.
-This can be mitigated by consuming the escape key in `performKeyEquivalent` but that's not a real fix to the underlying issue.
-The macOS leak checker also indicates that some `WKWebView` related resources are leaking, which might be related (or not).
-All of this might be caused by the `wry` fork not using `tao` for windowing, but this would need to be investigated further.
+I've reported this to Ableton, and this is currently mitigated by consuming the escape keypress behind the scenes.
 
 ## Features
 - send arbitrary JSON values back and forth to the webview using Serde

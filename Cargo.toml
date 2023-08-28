@@ -18,7 +18,7 @@ nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git" }
 parking_lot = "0.12.1"
 serde_json = "1.0"
 wry = { git = "https://github.com/maxjvh/wry" }
-baseview = { git = "https://github.com/RustAudio/baseview/" }
+baseview = { git = "https://github.com/ilmai/baseview", branch = "drag-and-drop-mac" }
 raw-window-handle = "0.4.2"
 crossbeam = "0.8.2"
 keyboard-types = "0.6.2"
