@@ -2766,6 +2766,7 @@ dependencies = [
 [[package]]
 name = "wry"
 version = "0.28.2"
+source = "git+https://github.com/maxjvh/wry#7328f44e631a9bc93094fc45596d4443b9f4200f"
 dependencies = [
  "base64",
  "block",
