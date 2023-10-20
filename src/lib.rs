@@ -103,32 +103,32 @@ impl WebViewEditor {
 }
 
 pub struct WindowHandler {
-    // context: Arc<dyn GuiContext>,
-    // event_loop_handler: Arc<EventLoopHandler>,
-    // keyboard_handler: Arc<KeyboardHandler>,
-    // webview: WebView,
-    // events_receiver: Receiver<WebviewEvent>,
-    // pub width: Arc<AtomicU32>,
-    // pub height: Arc<AtomicU32>,
+    context: Arc<dyn GuiContext>,
+    event_loop_handler: Arc<EventLoopHandler>,
+    keyboard_handler: Arc<KeyboardHandler>,
+    webview: WebView,
+    events_receiver: Receiver<WebviewEvent>,
+    pub width: Arc<AtomicU32>,
+    pub height: Arc<AtomicU32>,
 }
 
 impl WindowHandler {
     pub fn resize(&self, window: &mut baseview::Window, width: u32, height: u32) {
-        // self.width.store(width, Ordering::Relaxed);
-        // self.height.store(height, Ordering::Relaxed);
-        // self.context.request_resize();
-        // window.resize(Size {
-        //     width: width as f64,
-        //     height: height as f64,
-        // });
+        self.width.store(width, Ordering::Relaxed);
+        self.height.store(height, Ordering::Relaxed);
+        self.context.request_resize();
+        window.resize(Size {
+            width: width as f64,
+            height: height as f64,
+        });
     }
 
     pub fn send_json(&self, json: Value) -> Result<(), String> {
         // TODO: proper error handling
         if let Ok(json_str) = serde_json::to_string(&json) {
-            // self.webview
-            //     .evaluate_script(&format!("onPluginMessageInternal(`{}`);", json_str))
-            //     .unwrap();
+            self.webview
+                .evaluate_script(&format!("onPluginMessageInternal(`{}`);", json_str))
+                .unwrap();
             return Ok(());
         } else {
             return Err("Can't convert JSON to string.".to_owned());
@@ -136,8 +136,7 @@ impl WindowHandler {
     }
 
     pub fn next_event(&self) -> Result<WebviewEvent, crossbeam::channel::TryRecvError> {
-        // self.events_receiver.try_recv()
-        Err(crossbeam::channel::TryRecvError::Empty)
+        self.events_receiver.try_recv()
     }
 }
 
@@ -149,22 +148,21 @@ impl Drop for WindowHandler {
 
 impl baseview::WindowHandler for WindowHandler {
     fn on_frame(&mut self, window: &mut baseview::Window) {
-        // let setter = ParamSetter::new(&*self.context);
-        // (self.event_loop_handler)(&self, setter, window);
+        let setter = ParamSetter::new(&*self.context);
+        (self.event_loop_handler)(&self, setter, window);
     }
 
     fn on_event(&mut self, _window: &mut baseview::Window, event: Event) -> EventStatus {
-        // match event {
-        //     Event::Keyboard(event) => {
-        //         if (self.keyboard_handler)(event) {
-        //             EventStatus::Captured
-        //         } else {
-        //             EventStatus::Ignored
-        //         }
-        //     }
-        //     _ => EventStatus::Ignored,
-        // }
-        EventStatus::Ignored
+        match event {
+            Event::Keyboard(event) => {
+                if (self.keyboard_handler)(event) {
+                    EventStatus::Captured
+                } else {
+                    EventStatus::Ignored
+                }
+            }
+            _ => EventStatus::Ignored,
+        }
     }
 }
 
@@ -196,71 +194,71 @@ impl Editor for WebViewEditor {
             title: "Plug-in".to_owned(),
         };
 
-        // let width = self.width.clone();
-        // let height = self.height.clone();
-        // let developer_mode = self.developer_mode;
-        // let source = self.source.clone();
-        // let background_color = self.background_color;
-        // let custom_protocol = self.custom_protocol.clone();
-        // let event_loop_handler = self.event_loop_handler.clone();
-        // let keyboard_handler = self.keyboard_handler.clone();
+        let width = self.width.clone();
+        let height = self.height.clone();
+        let developer_mode = self.developer_mode;
+        let source = self.source.clone();
+        let background_color = self.background_color;
+        let custom_protocol = self.custom_protocol.clone();
+        let event_loop_handler = self.event_loop_handler.clone();
+        let keyboard_handler = self.keyboard_handler.clone();
 
         let window_handle = baseview::Window::open_parented(&parent, options, move |window| {
-            // use raw_window_handle::HasRawWindowHandle;
-            // let raw_handle = window.raw_window_handle();
+            use raw_window_handle::HasRawWindowHandle;
+            let raw_handle = window.raw_window_handle();
 
-            // let (events_sender, events_receiver) = unbounded();
-            // let file_drop_sender = events_sender.clone();
+            let (events_sender, events_receiver) = unbounded();
+            let file_drop_sender = events_sender.clone();
 
-            // let mut web_context = WebContext::new(Some(std::env::temp_dir()));
+            let mut web_context = WebContext::new(Some(std::env::temp_dir()));
 
-            // let mut webview_builder = WebViewBuilder::new(Window::new(raw_handle))
-            //     .unwrap() // always returns Ok()
-            //     .with_accept_first_mouse(true)
-            //     .with_devtools(developer_mode)
-            //     .with_web_context(&mut web_context)
-            //     .with_initialization_script(include_str!("script.js"))
-            //     .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
-            //         let _ = file_drop_sender.send(match msg {
-            //             FileDropEvent::Hovered { paths, .. } => WebviewEvent::FileHovered(paths),
-            //             FileDropEvent::Dropped { paths, .. } => WebviewEvent::FileDropped(paths),
-            //             FileDropEvent::Cancelled => WebviewEvent::FileDropCancelled,
-            //             _ => todo!("Can this ever happen?"),
-            //         });
-            //         false
-            //     })
-            //     .with_ipc_handler(move |_: &Window, msg: String| {
-            //         if let Ok(json_value) = serde_json::from_str(&msg) {
-            //             let _ = events_sender.send(WebviewEvent::JSON(json_value));
-            //         } else {
-            //             panic!("Invalid JSON from web view: {}.", msg);
-            //         }
-            //     })
-            //     .with_background_color(background_color);
+            let mut webview_builder = WebViewBuilder::new(Window::new(raw_handle))
+                .unwrap() // always returns Ok()
+                .with_accept_first_mouse(true)
+                .with_devtools(developer_mode)
+                .with_web_context(&mut web_context)
+                .with_initialization_script(include_str!("script.js"))
+                .with_file_drop_handler(move |_: &Window, msg: FileDropEvent| {
+                    let _ = file_drop_sender.send(match msg {
+                        FileDropEvent::Hovered { paths, .. } => WebviewEvent::FileHovered(paths),
+                        FileDropEvent::Dropped { paths, .. } => WebviewEvent::FileDropped(paths),
+                        FileDropEvent::Cancelled => WebviewEvent::FileDropCancelled,
+                        _ => todo!("Can this ever happen?"),
+                    });
+                    false
+                })
+                .with_ipc_handler(move |_: &Window, msg: String| {
+                    if let Ok(json_value) = serde_json::from_str(&msg) {
+                        let _ = events_sender.send(WebviewEvent::JSON(json_value));
+                    } else {
+                        panic!("Invalid JSON from web view: {}.", msg);
+                    }
+                })
+                .with_background_color(background_color);
 
-            // if let Some(custom_protocol) = custom_protocol.as_ref() {
-            //     let handler = custom_protocol.1.clone();
-            //     webview_builder.webview.custom_protocols.push((
-            //         custom_protocol.0.to_owned(),
-            //         Box::new(move |request| handler(request)),
-            //     ));
-            // }
+            if let Some(custom_protocol) = custom_protocol.as_ref() {
+                let handler = custom_protocol.1.clone();
+                webview_builder.webview.custom_protocols.push((
+                    custom_protocol.0.to_owned(),
+                    Box::new(move |request| handler(request)),
+                ));
+            }
 
-            // let webview = match source.as_ref() {
-            //     HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
-            //     HTMLSource::URL(url) => webview_builder.with_url(*url),
-            // }
-            // .unwrap()
-            // .build();
+            let webview = match source.as_ref() {
+                HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
+                HTMLSource::URL(url) => webview_builder.with_url(*url),
+            }
+            .unwrap()
+            .build();
 
             WindowHandler {
-                // context,
-                // event_loop_handler,
-                // // webview: webview.unwrap_or_else(|e| panic!("Failed to construct webview. {}", e)),
-                // events_receiver,
-                // keyboard_handler,
-                // width,
-                // height,
+                context,
+                event_loop_handler,
+                webview: webview.unwrap_or_else(|e| panic!("Failed to construct webview. {}", e)),
+                events_receiver,
+                keyboard_handler,
+                width,
+                height,
             }
         });
         return Box::new(Instance { window_handle });
