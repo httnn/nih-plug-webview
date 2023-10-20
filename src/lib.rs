@@ -246,7 +246,9 @@ impl Editor for WebViewEditor {
                 height,
             }
         });
-        return Box::new(Instance { window_handle });
+        return Box::new(Instance {
+            _window_handle: window_handle,
+        });
     }
 
     fn size(&self) -> (u32, u32) {
