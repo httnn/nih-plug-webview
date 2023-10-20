@@ -124,7 +124,7 @@ checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 [[package]]
 name = "baseview"
 version = "0.1.0"
-source = "git+https://github.com/RustAudio/baseview/#1d9806d5bd92275d0d8142d9c9c90198757b9b25"
+source = "git+https://github.com/ilmai/baseview?branch=drag-and-drop-mac#8270260382cb0a212a14f17ba1ef229c5b56de02"
 dependencies = [
  "cocoa",
  "core-foundation",
