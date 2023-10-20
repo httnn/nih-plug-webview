@@ -145,12 +145,6 @@ impl WindowHandler {
     }
 }
 
-impl Drop for WindowHandler {
-    fn drop(&mut self) {
-        println!("dropped WindowHandler");
-    }
-}
-
 impl baseview::WindowHandler for WindowHandler {
     fn on_frame(&mut self, window: &mut baseview::Window) {
         let setter = ParamSetter::new(&*self.context);
@@ -173,14 +167,7 @@ impl baseview::WindowHandler for WindowHandler {
 }
 
 struct Instance {
-    window_handle: WindowHandle,
-}
-
-impl Drop for Instance {
-    fn drop(&mut self) {
-        self.window_handle.close();
-        println!("dropped instance");
-    }
+    _window_handle: WindowHandle,
 }
 
 unsafe impl Send for Instance {}
