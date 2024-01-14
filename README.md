@@ -6,12 +6,12 @@ Built on top of [baseview](https://github.com/RustAudio/baseview).
 
 ## Current status
 
-I've only been able to test this on macOS so far on which it has been working very robustly.
+I've only been able to test this on macOS so far on which it has been working quite robustly.
 Other contributors have occasionally helped with the Windows side but unfortunately I currently have no idea if it really works or not.
-It would be great to get Windows support up to par, but I'd need someone familiar with Windows APIs to work on that.
+It would be great to get Windows support up to par, but someone familiar with Windows APIs would be needed to work on that.
 
 On macOS there is an unresolved issue where pressing the escape key in Ableton Live will lead to a crash.
-I've reported this to Ableton, and this is currently mitigated by consuming the escape keypress behind the scenes.
+I've reported this to Ableton, and I'm currently mitigating this by consuming the escape keypress behind the scenes.
 
 ## Features
 - send arbitrary JSON values back and forth to the webview using Serde
