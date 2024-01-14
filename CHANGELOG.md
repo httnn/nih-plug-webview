@@ -1,6 +1,6 @@
 # 2024-01-14
 - update baseview and nih-plug
-- switch from custom wry fork to official wry since it now supports attaching to a raw window handle
+- switch from custom wry fork to the official version of wry since it now supports attaching to a raw window handle (thanks to [this fork by toiglak](https://github.com/toiglak/nih-plug-webview)!)
   - still need to verify how intercepting keyboard events works now
 - drop Editor properly when window is closed (no more memory leaks hopefully)
 
