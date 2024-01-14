@@ -168,7 +168,13 @@ impl baseview::WindowHandler for WindowHandler {
 }
 
 struct Instance {
-    _window_handle: WindowHandle,
+    window_handle: WindowHandle,
+}
+
+impl Drop for Instance {
+    fn drop(&mut self) {
+        self.window_handle.close();
+    }
 }
 
 unsafe impl Send for Instance {}
@@ -246,9 +252,7 @@ impl Editor for WebViewEditor {
                 height,
             }
         });
-        return Box::new(Instance {
-            _window_handle: window_handle,
-        });
+        return Box::new(Instance { window_handle });
     }
 
     fn size(&self) -> (u32, u32) {
