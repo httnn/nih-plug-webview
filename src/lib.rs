@@ -1,6 +1,5 @@
-use baseview::{Event, Size, WindowHandle, WindowOpenOptions, WindowScalePolicy};
+use baseview::{Event, Size, Window, WindowHandle, WindowOpenOptions, WindowScalePolicy};
 use nih_plug::prelude::{Editor, GuiContext, ParamSetter};
-use raw_window_handle::HasRawWindowHandle;
 use serde_json::Value;
 use std::{
     borrow::Cow,
@@ -11,7 +10,7 @@ use std::{
 };
 use wry::{
     http::{Request, Response},
-    webview::{WebContext, WebView, WebViewBuilder, Window},
+    WebContext, WebView, WebViewBuilder,
 };
 
 use crossbeam::channel::{unbounded, Receiver};
@@ -21,7 +20,7 @@ pub use wry::http;
 pub use baseview::{DropData, DropEffect, EventStatus, MouseEvent};
 pub use keyboard_types::*;
 
-type EventLoopHandler = dyn Fn(&WindowHandler, ParamSetter, &mut baseview::Window) + Send + Sync;
+type EventLoopHandler = dyn Fn(&WindowHandler, ParamSetter, &mut Window) + Send + Sync;
 type KeyboardHandler = dyn Fn(KeyboardEvent) -> bool + Send + Sync;
 type MouseHandler = dyn Fn(MouseEvent) -> EventStatus + Send + Sync;
 type CustomProtocolHandler =
@@ -120,6 +119,12 @@ pub struct WindowHandler {
 
 impl WindowHandler {
     pub fn resize(&self, window: &mut baseview::Window, width: u32, height: u32) {
+        self.webview.set_bounds(wry::Rect {
+            x: 0,
+            y: 0,
+            width,
+            height,
+        });
         self.width.store(width, Ordering::Relaxed);
         self.height.store(height, Ordering::Relaxed);
         self.context.request_resize();
@@ -205,19 +210,22 @@ impl Editor for WebViewEditor {
         let mouse_handler = self.mouse_handler.clone();
 
         let window_handle = baseview::Window::open_parented(&parent, options, move |window| {
-            let raw_handle = window.raw_window_handle();
-
             let (events_sender, events_receiver) = unbounded();
 
             let mut web_context = WebContext::new(Some(std::env::temp_dir()));
 
-            let mut webview_builder = WebViewBuilder::new(Window::new(raw_handle))
-                .unwrap() // always returns Ok()
+            let mut webview_builder = WebViewBuilder::new_as_child(window)
+                .with_bounds(wry::Rect {
+                    x: 0,
+                    y: 0,
+                    width: width.load(Ordering::Relaxed) as u32,
+                    height: height.load(Ordering::Relaxed) as u32,
+                })
                 .with_accept_first_mouse(true)
                 .with_devtools(developer_mode)
                 .with_web_context(&mut web_context)
                 .with_initialization_script(include_str!("script.js"))
-                .with_ipc_handler(move |_: &Window, msg: String| {
+                .with_ipc_handler(move |msg: String| {
                     if let Ok(json_value) = serde_json::from_str(&msg) {
                         let _ = events_sender.send(json_value);
                     } else {
@@ -228,10 +236,10 @@ impl Editor for WebViewEditor {
 
             if let Some(custom_protocol) = custom_protocol.as_ref() {
                 let handler = custom_protocol.1.clone();
-                webview_builder.webview.custom_protocols.push((
-                    custom_protocol.0.to_owned(),
-                    Box::new(move |request| handler(request)),
-                ));
+                webview_builder = webview_builder
+                    .with_custom_protocol(custom_protocol.0.to_owned(), move |request| {
+                        handler(&request).unwrap()
+                    });
             }
 
             let webview = match source.as_ref() {

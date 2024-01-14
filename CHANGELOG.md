@@ -1,5 +1,7 @@
 # 2024-01-14
-- update baseview and nih-plug dependencies
+- update baseview and nih-plug
+- switch from custom wry fork to official wry since it now supports attaching to a raw window handle
+  - still need to verify how intercepting keyboard events works now
 - drop Editor properly when window is closed (no more memory leaks hopefully)
 
 # 2023-07-11
