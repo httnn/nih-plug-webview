@@ -1,5 +1,6 @@
 use baseview::{Event, Size, WindowHandle, WindowOpenOptions, WindowScalePolicy};
 use nih_plug::prelude::{Editor, GuiContext, ParamSetter};
+use raw_window_handle::HasRawWindowHandle;
 use serde_json::Value;
 use std::{
     borrow::Cow,
@@ -198,7 +199,6 @@ impl Editor for WebViewEditor {
         let mouse_handler = self.mouse_handler.clone();
 
         let window_handle = baseview::Window::open_parented(&parent, options, move |window| {
-            use raw_window_handle::HasRawWindowHandle;
             let raw_handle = window.raw_window_handle();
 
             let (events_sender, events_receiver) = unbounded();
