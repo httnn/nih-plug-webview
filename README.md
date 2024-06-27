@@ -50,7 +50,9 @@ After you've configured your framework/bundler to export with a custom protocol,
 
 If you don't have it, add the `include_dir` crate:
 
-`cargo add include_dir`
+```
+cargo add include_dir
+```
 
 Where you define your editor, add the following:
 ```rust
@@ -89,6 +91,8 @@ fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Edi
 This is, as far as I know, not natively supported by any web frameworks. You'll either have to find a third-party plugin/extension for your framework or do it yourself. This involves replacing every script and stylesheet tag in your main HTML file with the actual contents of those JS/CSS files. (As for other media like images, etc. I don't know if those are supported with this method). You'll probably want to use an automation tool like gulp to post-process your main HTML file and inline everything. Consider just writing your frontend in plain HTML/CSS/JS, and good luck. 
 
 ### With Plain HTML
+If you don't want to use a web framework, you may write a frontend in plain HTML/CSS/JS. Similarly to using a web framework, you may either inline everything in one HTML file, or register a custom protocol (see above) and make sure that all of the links in your tags use that protocol. 
+
 [Check out the example.](https://github.com/maxjvh/nih-plug-webview/blob/main/example/src/)
 
 Build the example with `cargo xtask bundle gain` in the `example` folder.
