@@ -28,7 +28,7 @@ This project has been tested and works on Windows and macOS.
 Essentially every modern web framework should be supported *at least for development* (or if you just want to try this out). For this, you can use a [URL Source](https://github.com/httnn/nih-plug-webview/blob/32e10ccbcf90c8345a8ce3c53c0445fae03c3caa/src/lib.rs#L43C3-L43C22) corresponding to your dev server. **This will also support hot reloading on the frontend** for rapid GUI development.
 
 
-In a production/release environment, things get more complicated because a dev server isn't available on user/client machines. So, the only option is **export the frontend to static content.** (By the way, if your framework somehow doesn't support exporting to static content, you probably won't be able to do this) 
+In a production/release environment, things get more complicated because a dev server isn't available on user/client machines. So, the only option is to **export the frontend to static content.** (By the way, if your framework somehow doesn't support exporting to static content, you probably won't be able to do this) 
 
 This leaves two options:
 1. Request assets with a custom protocol (Recommended)
@@ -46,15 +46,14 @@ This method involves configuring your framework's bundler to link assets with a 
 - Windows: `http://<protocol name>.localhost/`
 (Windows is the only platform I've tested)
 
-After you've configured your framework/bundler to export with a custom protocol, you'll need to register the protocol in Rust.
-
-If you don't have it, add the `include_dir` crate:
+After configuring your framework/bundler to export with a custom protocol, you'll need to register the protocol in Rust.
+1. If you don't have it, add the `include_dir` crate:
 
 ```
 cargo add include_dir
 ```
 
-Where you define your editor, add the following:
+2. Where you define your editor, add the following:
 ```rust
 
 // replace this with the correct output path
