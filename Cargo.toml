@@ -22,3 +22,4 @@ baseview = { git = "https://github.com/RustAudio/baseview" }
 raw-window-handle = "0.5"
 crossbeam = "0.8.2"
 keyboard-types = "0.6.2"
+mime_guess = "2.0.4"
