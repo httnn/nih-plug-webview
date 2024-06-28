@@ -147,9 +147,9 @@ impl WindowHandler {
             self.webview
                 .evaluate_script(&format!("onPluginMessageInternal(`{}`);", json_str))
                 .unwrap();
-            return Ok(());
+            Ok(())
         } else {
-            return Err("Can't convert JSON to string.".to_owned());
+            Err("Can't convert JSON to string.".to_owned())
         }
     }
 
@@ -161,7 +161,7 @@ impl WindowHandler {
 impl baseview::WindowHandler for WindowHandler {
     fn on_frame(&mut self, window: &mut baseview::Window) {
         let setter = ParamSetter::new(&*self.context);
-        (self.event_loop_handler)(&self, setter, window);
+        (self.event_loop_handler)(self, setter, window);
     }
 
     fn on_event(&mut self, _window: &mut baseview::Window, event: Event) -> EventStatus {
@@ -226,8 +226,8 @@ impl Editor for WebViewEditor {
                 .with_bounds(wry::Rect {
                     x: 0,
                     y: 0,
-                    width: width.load(Ordering::Relaxed) as u32,
-                    height: height.load(Ordering::Relaxed) as u32,
+                    width: width.load(Ordering::Relaxed),
+                    height: height.load(Ordering::Relaxed),
                 })
                 .with_accept_first_mouse(true)
                 .with_devtools(developer_mode)
@@ -251,6 +251,12 @@ impl Editor for WebViewEditor {
             }
             if let Some(dir) = frontend_dir {
                 let protocol_name = String::from("wry");
+                #[cfg(target_os = "windows")]
+                let url_scheme = format!("http://{}.localhost", protocol_name);
+                // TODO:
+                // needs to be tested
+                #[cfg(not(target_os = "windows"))]
+                let url_scheme = format!("{}://localhost", protocol_name);
                 webview_builder = webview_builder
                     .with_custom_protocol(protocol_name.clone(), move |request| {
                         match get_wry_response(request, &dir) {
@@ -265,17 +271,17 @@ impl Editor for WebViewEditor {
                     })
                     /*
                     TODO:
-                    * - change URL for different platforms
+                    *
                     * - may be mutually exclusive with HTMLSource::URL
                     */
                     // tell the webview to load the custom protocol
-                    .with_url(&format!("http://{}.localhost", protocol_name))
+                    .with_url(&url_scheme)
                     .unwrap()
             }
 
             let webview = match source.as_ref() {
                 HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
-                HTMLSource::URL(url) => webview_builder.with_url(*url),
+                HTMLSource::URL(url) => webview_builder.with_url(url),
             }
             .unwrap()
             .build();
@@ -291,7 +297,7 @@ impl Editor for WebViewEditor {
                 height,
             }
         });
-        return Box::new(Instance { window_handle });
+        Box::new(Instance { window_handle })
     }
 
     fn size(&self) -> (u32, u32) {
@@ -303,7 +309,7 @@ impl Editor for WebViewEditor {
 
     fn set_scale_factor(&self, _factor: f32) -> bool {
         // TODO: implement for Windows and Linux
-        return false;
+        false
     }
 
     fn param_values_changed(&self) {}
