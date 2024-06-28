@@ -269,11 +269,6 @@ impl Editor for WebViewEditor {
                                 .map(Into::into),
                         }
                     })
-                    /*
-                    TODO:
-                    *
-                    * - may be mutually exclusive with HTMLSource::URL
-                    */
                     // tell the webview to load the custom protocol
                     .with_url(&url_scheme)
                     .unwrap()
