@@ -50,18 +50,10 @@ export default nextConfig;
 In NIH-plug's `editor` function (in `impl Plugin`), you might want something like:
 
 ```rust
-// with debug builds, refer to localhost
-#[cfg(debug_assertions)]
-let src = HTMLSource::URL("http://localhost:3000");
-// for release builds, use static content
-#[cfg(not(debug_assertions))]
-let src = HTMLSource::String(include_str!("<path/to/index.html>"));
-let editor = WebViewEditor::new(src, (300, 300)).with_frontend_dir("<base/static/export/path>".into())
+let editor = editor_with_frontend_dir("<../gui/out/>".into(), (300, 450), None)
 // ... other editor configuration
 ```
-**NOTE**: Make sure to replace the paths in the example!
-
-With a setup like this, you can develop your GUI on localhost (make sure to start the dev server!), and then export the app to static files and use those in release versions of your plugin. (Because user machines don't have access to a dev server..)
+**NOTE**: Make sure to replace the path(s) in the example!
 
 ### Plain HTML/CSS/JS
 Similarly to using a web framework, you should probably have an existing NIH-plug project set up before starting with this. 
@@ -70,4 +62,4 @@ If you want to write your GUI in HTML, CSS, and JS, there are a few options.
 
 One option is to write and inline everything (*all* CSS/JS scripts) in one HTML file and reference it with `HTMLSource::String`. Check out [the example.](https://github.com/maxjvh/nih-plug-webview/blob/main/example/src/)
 
-If you don't want to do this and want separate files, you'll need `.with_frontend_dir` so that your HTML file can correctly find the other files.
+If you don't want to do this and want separate files, you'll need to register a custom protocol. 
