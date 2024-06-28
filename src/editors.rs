@@ -3,7 +3,9 @@ use std::path::PathBuf;
 use wry::http::Response;
 ///
 /// Creates a `WebViewEditor` pre-configured to work with web frameworks.
-/// This function essentially registers a custom protocol to serve requested assets in the given static output directory
+/// This function essentially registers a custom protocol to serve requested assets in the given static output directory.
+///
+/// **NOTE**: This helper function assumes your "main" HTML file is "index.html" located at `root_dir`. You may have issues if this isn't the case for you.
 ///
 /// ## Parameters
 /// - `root_dir`: A `PathBuf` to your web framework's static output directory
