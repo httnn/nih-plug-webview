@@ -3,6 +3,7 @@ use nih_plug::prelude::{Editor, GuiContext, ParamSetter};
 use serde_json::Value;
 use std::{
     borrow::Cow,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU32, Ordering},
         Arc,
@@ -34,6 +35,7 @@ pub struct WebViewEditor {
     keyboard_handler: Arc<KeyboardHandler>,
     mouse_handler: Arc<MouseHandler>,
     custom_protocol: Option<(String, Arc<CustomProtocolHandler>)>,
+    frontend_dir: Option<PathBuf>,
     developer_mode: bool,
     background_color: (u8, u8, u8, u8),
 }
@@ -57,6 +59,7 @@ impl WebViewEditor {
             keyboard_handler: Arc::new(|_| false),
             mouse_handler: Arc::new(|_| EventStatus::Ignored),
             custom_protocol: None,
+            frontend_dir: None,
         }
     }
 
@@ -73,6 +76,10 @@ impl WebViewEditor {
             + Sync,
     {
         self.custom_protocol = Some((name, Arc::new(handler)));
+        self
+    }
+    pub fn with_frontend_dir(mut self, path: PathBuf) -> Self {
+        self.frontend_dir = Some(path);
         self
     }
 
@@ -208,6 +215,7 @@ impl Editor for WebViewEditor {
         let event_loop_handler = self.event_loop_handler.clone();
         let keyboard_handler = self.keyboard_handler.clone();
         let mouse_handler = self.mouse_handler.clone();
+        let frontend_dir = self.frontend_dir.clone();
 
         let window_handle = baseview::Window::open_parented(&parent, options, move |window| {
             let (events_sender, events_receiver) = unbounded();
@@ -240,6 +248,29 @@ impl Editor for WebViewEditor {
                     .with_custom_protocol(custom_protocol.0.to_owned(), move |request| {
                         handler(&request).unwrap()
                     });
+            }
+            if let Some(dir) = frontend_dir {
+                let protocol_name = String::from("wry");
+                webview_builder = webview_builder
+                    .with_custom_protocol(protocol_name.clone(), move |request| {
+                        match get_wry_response(request, &dir) {
+                            Ok(r) => r.map(Into::into),
+                            Err(e) => http::Response::builder()
+                                .header(http::header::CONTENT_TYPE, "text/plain")
+                                .status(500)
+                                .body(e.to_string().as_bytes().to_vec())
+                                .unwrap()
+                                .map(Into::into),
+                        }
+                    })
+                    /*
+                    TODO:
+                    * - change URL for different platforms
+                    * - may be mutually exclusive with HTMLSource::URL
+                    */
+                    // tell the webview to load the custom protocol
+                    .with_url(&format!("http://{}.localhost", protocol_name))
+                    .unwrap()
             }
 
             let webview = match source.as_ref() {
@@ -280,4 +311,34 @@ impl Editor for WebViewEditor {
     fn param_value_changed(&self, _id: &str, _normalized_value: f32) {}
 
     fn param_modulation_changed(&self, _id: &str, _modulation_offset: f32) {}
+}
+
+fn get_wry_response(
+    request: Request<Vec<u8>>,
+    root: &Path,
+) -> Result<http::Response<Vec<u8>>, Box<dyn std::error::Error>> {
+    let path = request.uri().path();
+    let path = if path == "/" {
+        "index.html"
+    } else {
+        //  removing leading slash
+        &path[1..]
+    };
+    let full_path = root.join(path);
+    let content = std::fs::read(std::fs::canonicalize(&full_path)?)?;
+
+    // Return asset contents and mime types based on file extentions
+    // If you don't want to do this manually, there are some crates for you.
+    // Such as `infer` and `mime_guess`.
+    let mimetype = match full_path.extension().unwrap().to_str().unwrap() {
+        "js" => "text/javascript",
+        "css" => "text/css",
+        "ttf" => "font/ttf",
+        _ => "",
+    };
+
+    Response::builder()
+        .header(http::header::CONTENT_TYPE, mimetype)
+        .body(content)
+        .map_err(Into::into)
 }
