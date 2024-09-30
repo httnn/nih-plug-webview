@@ -137,8 +137,9 @@ impl WindowHandler {
     pub fn send_json(&self, json: Value) -> Result<(), String> {
         // TODO: proper error handling
         if let Ok(json_str) = serde_json::to_string(&json) {
+            let json_str_quoted = serde_json::to_string(&json_str);
             self.webview
-                .evaluate_script(&format!("onPluginMessageInternal(`{}`);", json_str))
+                .evaluate_script(&format!("onPluginMessageInternal({});", json_str_quoted))
                 .unwrap();
             return Ok(());
         } else {
