@@ -115,68 +115,71 @@ impl Plugin for Gain {
     fn editor(&mut self, _async_executor: AsyncExecutor<Self>) -> Option<Box<dyn Editor>> {
         let params = self.params.clone();
         let gain_value_changed = self.params.gain_value_changed.clone();
-        let editor = WebViewEditor::new(HTMLSource::String(include_str!("gui.html")), (200, 200))
-            .with_background_color((150, 150, 150, 255))
-            .with_developer_mode(true)
-            .with_keyboard_handler(move |event| {
-                println!("keyboard event: {event:#?}");
-                event.key == Key::Escape
-            })
-            .with_mouse_handler(|event| match event {
-                MouseEvent::DragEntered { .. } => {
-                    println!("drag entered");
-                    EventStatus::AcceptDrop(DropEffect::Copy)
+        let editor = WebViewEditor::new(
+            HTMLSource::String(include_str!("gui.html").to_string()),
+            (200, 200),
+        )
+        .with_background_color((150, 150, 150, 255))
+        .with_developer_mode(true)
+        .with_keyboard_handler(move |event| {
+            println!("keyboard event: {event:#?}");
+            event.key == Key::Escape
+        })
+        .with_mouse_handler(|event| match event {
+            MouseEvent::DragEntered { .. } => {
+                println!("drag entered");
+                EventStatus::AcceptDrop(DropEffect::Copy)
+            }
+            MouseEvent::DragMoved { .. } => {
+                println!("drag moved");
+                EventStatus::AcceptDrop(DropEffect::Copy)
+            }
+            MouseEvent::DragLeft => {
+                println!("drag left");
+                EventStatus::Ignored
+            }
+            MouseEvent::DragDropped { data, .. } => {
+                if let DropData::Files(files) = data {
+                    println!("drag dropped: {:?}", files);
                 }
-                MouseEvent::DragMoved { .. } => {
-                    println!("drag moved");
-                    EventStatus::AcceptDrop(DropEffect::Copy)
-                }
-                MouseEvent::DragLeft => {
-                    println!("drag left");
-                    EventStatus::Ignored
-                }
-                MouseEvent::DragDropped { data, .. } => {
-                    if let DropData::Files(files) = data {
-                        println!("drag dropped: {:?}", files);
-                    }
-                    EventStatus::AcceptDrop(DropEffect::Copy)
-                }
-                _ => EventStatus::Ignored,
-            })
-            .with_event_loop(move |ctx, setter, window| {
-                while let Ok(value) = ctx.next_event() {
-                    if let Ok(action) = serde_json::from_value(value) {
-                        match action {
-                            Action::SetGain { value } => {
-                                setter.begin_set_parameter(&params.gain);
-                                setter.set_parameter_normalized(&params.gain, value);
-                                setter.end_set_parameter(&params.gain);
-                            }
-                            Action::SetSize { width, height } => {
-                                ctx.resize(window, width, height);
-                            }
-                            Action::Init => {
-                                let _ = ctx.send_json(json!({
-                                    "type": "set_size",
-                                    "width": ctx.width.load(Ordering::Relaxed),
-                                    "height": ctx.height.load(Ordering::Relaxed)
-                                }));
-                            }
+                EventStatus::AcceptDrop(DropEffect::Copy)
+            }
+            _ => EventStatus::Ignored,
+        })
+        .with_event_loop(move |ctx, setter, window| {
+            while let Ok(value) = ctx.next_event() {
+                if let Ok(action) = serde_json::from_value(value) {
+                    match action {
+                        Action::SetGain { value } => {
+                            setter.begin_set_parameter(&params.gain);
+                            setter.set_parameter_normalized(&params.gain, value);
+                            setter.end_set_parameter(&params.gain);
                         }
-                    } else {
-                        panic!("Invalid action received from web UI.")
+                        Action::SetSize { width, height } => {
+                            ctx.resize(window, width, height);
+                        }
+                        Action::Init => {
+                            let _ = ctx.send_json(json!({
+                                "type": "set_size",
+                                "width": ctx.width.load(Ordering::Relaxed),
+                                "height": ctx.height.load(Ordering::Relaxed)
+                            }));
+                        }
                     }
+                } else {
+                    panic!("Invalid action received from web UI.")
                 }
+            }
 
-                if gain_value_changed.swap(false, Ordering::Relaxed) {
-                    let _ = ctx.send_json(json!({
-                        "type": "param_change",
-                        "param": "gain",
-                        "value": params.gain.unmodulated_normalized_value(),
-                        "text": params.gain.to_string()
-                    }));
-                }
-            });
+            if gain_value_changed.swap(false, Ordering::Relaxed) {
+                let _ = ctx.send_json(json!({
+                    "type": "param_change",
+                    "param": "gain",
+                    "value": params.gain.unmodulated_normalized_value(),
+                    "text": params.gain.to_string()
+                }));
+            }
+        });
 
         Some(Box::new(editor))
     }

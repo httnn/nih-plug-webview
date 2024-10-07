@@ -20,6 +20,9 @@ pub use wry::http;
 pub use baseview::{DropData, DropEffect, EventStatus, MouseEvent};
 pub use keyboard_types::*;
 
+/// This module contains helper functions to create/modify `WebViewEditor`s with certain functionality.
+pub mod editors;
+
 type EventLoopHandler = dyn Fn(&WindowHandler, ParamSetter, &mut Window) + Send + Sync;
 type KeyboardHandler = dyn Fn(KeyboardEvent) -> bool + Send + Sync;
 type MouseHandler = dyn Fn(MouseEvent) -> EventStatus + Send + Sync;
@@ -39,8 +42,8 @@ pub struct WebViewEditor {
 }
 
 pub enum HTMLSource {
-    String(&'static str),
-    URL(&'static str),
+    String(String),
+    URL(String),
 }
 
 impl WebViewEditor {
@@ -140,9 +143,9 @@ impl WindowHandler {
             self.webview
                 .evaluate_script(&format!("onPluginMessageInternal(`{}`);", json_str))
                 .unwrap();
-            return Ok(());
+            Ok(())
         } else {
-            return Err("Can't convert JSON to string.".to_owned());
+            Err("Can't convert JSON to string.".to_owned())
         }
     }
 
@@ -154,7 +157,7 @@ impl WindowHandler {
 impl baseview::WindowHandler for WindowHandler {
     fn on_frame(&mut self, window: &mut baseview::Window) {
         let setter = ParamSetter::new(&*self.context);
-        (self.event_loop_handler)(&self, setter, window);
+        (self.event_loop_handler)(self, setter, window);
     }
 
     fn on_event(&mut self, _window: &mut baseview::Window, event: Event) -> EventStatus {
@@ -218,8 +221,8 @@ impl Editor for WebViewEditor {
                 .with_bounds(wry::Rect {
                     x: 0,
                     y: 0,
-                    width: width.load(Ordering::Relaxed) as u32,
-                    height: height.load(Ordering::Relaxed) as u32,
+                    width: width.load(Ordering::Relaxed),
+                    height: height.load(Ordering::Relaxed),
                 })
                 .with_accept_first_mouse(true)
                 .with_devtools(developer_mode)
@@ -243,8 +246,8 @@ impl Editor for WebViewEditor {
             }
 
             let webview = match source.as_ref() {
-                HTMLSource::String(html_str) => webview_builder.with_html(*html_str),
-                HTMLSource::URL(url) => webview_builder.with_url(*url),
+                HTMLSource::String(html_str) => webview_builder.with_html(html_str),
+                HTMLSource::URL(url) => webview_builder.with_url(url),
             }
             .unwrap()
             .build();
@@ -260,7 +263,7 @@ impl Editor for WebViewEditor {
                 height,
             }
         });
-        return Box::new(Instance { window_handle });
+        Box::new(Instance { window_handle })
     }
 
     fn size(&self) -> (u32, u32) {
@@ -272,7 +275,7 @@ impl Editor for WebViewEditor {
 
     fn set_scale_factor(&self, _factor: f32) -> bool {
         // TODO: implement for Windows and Linux
-        return false;
+        false
     }
 
     fn param_values_changed(&self) {}
