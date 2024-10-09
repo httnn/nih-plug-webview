@@ -134,14 +134,13 @@ impl WindowHandler {
         });
     }
 
-    pub fn send_json(&self, json: Value) -> Result<(), String> {
+    pub fn send_json(&self, json: Value) {
         let json_str = json.to_string();
         let json_str_quoted =
             serde_json::to_string(&json_str).expect("Should not fail: the value is always string");
         self.webview
             .evaluate_script(&format!("onPluginMessageInternal({});", json_str_quoted))
             .unwrap();
-        return Ok(());
     }
 
     pub fn next_event(&self) -> Result<Value, crossbeam::channel::TryRecvError> {

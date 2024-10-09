@@ -1,3 +1,6 @@
+# 2024-09-10
+- `WindowHandler::send_json()` doesn't return a `Result` anymore
+
 # 2024-01-14
 - update baseview and nih-plug
 - switch from custom wry fork to the official version of wry since it now supports attaching to a raw window handle (thanks to [this fork by toiglak](https://github.com/toiglak/nih-plug-webview)!)

@@ -156,7 +156,7 @@ impl Plugin for Gain {
                                 ctx.resize(window, width, height);
                             }
                             Action::Init => {
-                                let _ = ctx.send_json(json!({
+                                ctx.send_json(json!({
                                     "type": "set_size",
                                     "width": ctx.width.load(Ordering::Relaxed),
                                     "height": ctx.height.load(Ordering::Relaxed)
@@ -169,7 +169,7 @@ impl Plugin for Gain {
                 }
 
                 if gain_value_changed.swap(false, Ordering::Relaxed) {
-                    let _ = ctx.send_json(json!({
+                    ctx.send_json(json!({
                         "type": "param_change",
                         "param": "gain",
                         "value": params.gain.unmodulated_normalized_value(),
