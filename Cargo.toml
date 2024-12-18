@@ -8,10 +8,7 @@ license = "ISC"
 description = "An adapter to use webview GUIs with NIH-plug"
 
 [workspace]
-members = [
-  "example",
-  "xtask"
-]
+members = ["example", "xtask"]
 
 [dependencies]
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git" }
@@ -23,3 +20,6 @@ raw-window-handle = "0.5"
 crossbeam = "0.8.2"
 keyboard-types = "0.6.2"
 mime_guess = "2.0.4"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18.2"

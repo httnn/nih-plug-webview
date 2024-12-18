@@ -157,6 +157,13 @@ impl WindowHandler {
 impl baseview::WindowHandler for WindowHandler {
     fn on_frame(&mut self, window: &mut baseview::Window) {
         let setter = ParamSetter::new(&*self.context);
+
+        // then advance gtk event loop  <----- IMPORTANT
+        #[cfg(target_os = "linux")]
+        while gtk::events_pending() {
+            gtk::main_iteration_do(false);
+        }
+
         (self.event_loop_handler)(self, setter, window);
     }
 
@@ -213,6 +220,9 @@ impl Editor for WebViewEditor {
         let mouse_handler = self.mouse_handler.clone();
 
         let window_handle = baseview::Window::open_parented(&parent, options, move |window| {
+            #[cfg(target_os = "linux")]
+            gtk::init().unwrap(); // <----- IMPORTANT
+
             let (events_sender, events_receiver) = unbounded();
 
             let mut web_context = WebContext::new(Some(std::env::temp_dir()));
